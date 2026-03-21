@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>D&D Tavolo Proiettore - V14 Center Rotation</title>
+    <style>
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #050505; font-family: sans-serif; touch-action: none; color: #eee; }
+        
+        #viewport { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
+        #world-container { position: absolute; top: 0; left: 0; transform-origin: 0 0; will-change: transform; width: 0; height: 0; }
+        
+        /* L'asse di rotazione e scala è ora impostato esattamente al centro del layer */
+        .layer-wrapper { position: absolute; top: 0; left: 0; transform-origin: center; will-change: transform; }
+        .layer-img { width: 100%; height: 100%; object-fit: fill; display: block; pointer-events: none; }
+        .fog-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+        
+        #calibration-square { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); border: 4px solid #ff3333; background: rgba(255, 51, 51, 0.3); z-index: 100; pointer-events: none; width: 50px; height: 50px; display: none; }
+        
+        #ui-panel { position: absolute; top: 10px; left: 10px; z-index: 60; background: rgba(20,20,20,0.95); padding: 12px; border-radius: 8px; border: 1px solid #444; width: 320px; max-height: 90vh; overflow-y: auto; box-shadow: 0 5px 15px rgba(0,0,0,0.9); transition: opacity 0.2s; }
+        
+        h3 { margin: 0 0 8px 0; font-size: 13px; color: #fff; text-transform: uppercase; border-bottom: 1px solid #555; padding-bottom: 4px; }
+        label { font-size: 11px; font-weight: bold; color: #aaa; display: block; margin: 8px 0 3px 0; text-transform: uppercase; }
+        input[type="file"], input[type="range"] { width: 100%; margin-bottom: 8px; }
+        input[type="file"] { font-size: 12px; color: #ccc; }
+        
+        button { padding: 6px; font-size: 12px; border-radius: 4px; border: none; cursor: pointer; font-weight: bold; background: #444; color: white; transition: 0.1s; width: 100%; }
+        button:active { transform: scale(0.95); }
+        
+        .row { display: flex; gap: 4px; margin-bottom: 8px; }
+        .row button { flex: 1; margin: 0; background: #333; border: 1px solid #222; }
+        .row button.active { background: #007bff; border-color: #66b0ff; box-shadow: inset 0 0 5px rgba(0,0,0,0.5); }
+        
+        .list-container { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+        .item-row { display: flex; align-items: center; background: #222; padding: 4px; border-radius: 4px; border: 1px solid #333; }
+        .item-row.active { border-color: #5cb85c; background: #1a2a1a; }
+        
+        .item-name { flex: 1; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; padding: 4px; }
+        .btn-icon { width: 26px; height: 26px; padding: 0; background: #333; font-size: 12px; display: flex; align-items: center; justify-content: center; margin-left: 2px; }
+        .btn-icon:hover { background: #555; }
+        .btn-icon.on { background: #f0ad4e; color: black; }
+        .btn-icon.danger { background: #d9534f; color: white; }
+        
+        #btn-fullscreen { background-color: #17a2b8; padding: 10px; font-size: 14px; margin-top: 5px; }
+        #hide-ui { background-color: #5cb85c; padding: 10px; font-size: 14px; margin-top: 5px; }
+        
+        .hidden { display: none !important; opacity: 0; pointer-events: none; }
+        #reveal-ui { position: absolute; top: 10px; right: 10px; z-index: 100; background: rgba(0,0,0,0.6); color: white; border-radius: 50%; width: 50px; height: 50px; font-size: 24px; border: 2px solid rgba(255,255,255,0.4); cursor: pointer; transition: opacity 0.2s; }
+        
+        #loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 200; display: flex; justify-content: center; align-items: center; flex-direction: column; color: white; font-size: 20px; display: none; }
+        .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #5cb85c; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 15px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+<div id="loading-overlay">
+    <div class="spinner"></div>
+    <div id="loading-text">Caricamento in corso...</div>
+</div>
+
+<div id="ui-panel">
+    <h3>💾 Gestione Campagna</h3>
+    <div class="row">
+        <button id="btn-save-project" style="background: #e0a800; color: #000;">💾 Salva</button>
+        <button id="btn-load-trigger" style="background: #138496;">📂 Carica</button>
+        <input type="file" id="upload-project" accept=".json" class="hidden">
+    </div>
+
+    <h3>🎬 Scene</h3>
+    <div class="list-container" id="scene-list"></div>
+    <button id="btn-new-scene" style="background: #0056b3; margin-bottom:10px;">+ Nuova Scena</button>
+    
+    <div id="scene-controls" class="hidden">
+        <h3>1. Livelli (Layer)</h3>
+        <input type="file" id="upload-layer" accept="image/*">
+        <div class="list-container" id="layer-list"></div>
+
+        <h3>2. Strumenti</h3>
+        <div class="row">
+            <button id="tool-camera" class="active">🌍 Camera</button>
+            <button id="tool-layer">✋ Sposta Layer</button>
+        </div>
+        <div class="row">
+            <button id="tool-draw">⬛ +Nebbia</button>
+            <button id="tool-erase">🧽 -Nebbia</button>
+        </div>
+        
+        <label>Rotazione Layer (<span id="rot-display" style="color:#f0ad4e;">0</span>°):</label>
+        <div class="row" style="align-items: center; margin-bottom: 8px;">
+            <input type="range" id="layer-rotation" min="0" max="360" value="0" style="margin-bottom: 0;">
+            <button id="btn-reset-rot" style="flex: 0 0 auto; width: 40px; margin-left: 5px; padding: 4px;">0°</button>
+        </div>
+        
+        <button id="btn-lock-camera" style="margin-bottom: 8px; background: #333;">🔓 Camera Sbloccata</button>
+        
+        <label>Zoom Camera (Globale):</label>
+        <div class="row">
+            <button id="btn-zoom-out">🔍 -</button>
+            <button id="btn-zoom-in">🔍 +</button>
+        </div>
+
+        <label>Spessore Nebbia:</label>
+        <input type="range" id="brush-size" min="10" max="300" value="80">
+        <div class="row">
+            <button id="clear-fog" style="background:#d9534f;">Pulisci Nebbia</button>
+            <button id="fill-fog" style="background:#555;">Copri Layer</button>
+        </div>
+
+        <h3>3. Calibrazione</h3>
+        <button id="toggle-square" style="background: #d9831f; margin-bottom:5px;">Mostra Quadrato</button>
+        <label>Dimensione Quadrato:</label>
+        <input type="range" id="square-size" min="1" max="1000" value="50">
+    </div>
+
+    <button id="btn-fullscreen">🔲 Schermo Intero</button>
+    <button id="hide-ui">Nascondi Menù</button>
+    <div style="text-align: center; margin-top: 5px; font-size: 10px; color: #888;">(Doppio Tap sullo sfondo per nascondere tutto)</div>
+</div>
+
+<button id="reveal-ui" class="hidden">⚙️</button>
+
+<div id="viewport">
+    <div id="world-container"></div>
+    <div id="calibration-square"></div>
+</div>
+
+<script>
+    // --- STATO ARCHITETTURA ---
+    let scenes = [];
+    let currentSceneId = null;
+    let activeLayerId = null; 
+    let sceneCounter = 0;
+    let layerCounter = 0;
+    const MAX_FOG_RES = 1500;
+
+    // --- DOM ---
+    const viewport = document.getElementById('viewport');
+    const worldContainer = document.getElementById('world-container');
+    const sceneListEl = document.getElementById('scene-list');
+    const layerListEl = document.getElementById('layer-list');
+    const sceneControls = document.getElementById('scene-controls');
+    const loadingOverlay = document.getElementById('loading-overlay');
+    const btnLockCamera = document.getElementById('btn-lock-camera');
+    const rotDisplay = document.getElementById('rot-display');
+
+    // --- INTERAZIONE ---
+    let currentMode = 'camera'; 
+    let isInteracting = false;
+    let startX = 0, startY = 0;
+    let lastPinchDist = null, lastPinchMid = null;
+    let pendingDraw = false;
+    let drawLastX = 0, drawLastY = 0, drawCurrX = 0, drawCurrY = 0;
+    let lastTapTime = 0;
+    let isCinemaMode = false;
+
+    // --- SCENE E LAYER ---
+    function createNewScene() {
+        sceneCounter++;
+        const newScene = { id: sceneCounter, name: `Scena ${sceneCounter}`, layers: [], panX: 0, panY: 0, scale: 1, cameraLocked: false };
+        scenes.push(newScene);
+        switchScene(newScene.id);
+        renderSceneList();
+    }
+
+    function switchScene(id) {
+        currentSceneId = id; activeLayerId = null; updateToolUI('camera');
+        const scene = scenes.find(s => s.id === id);
+        sceneControls.classList.remove('hidden');
+        renderSceneList();
+        worldContainer.innerHTML = '';
+        scene.layers.forEach(layer => { worldContainer.appendChild(layer.wrapper); updateLayerTransform(layer); });
+        applyWorldTransform(scene.panX, scene.panY, scene.scale);
+        updateCameraLockUI(scene);
+        renderLayers();
+    }
+
+    function renameScene(id) {
+        const scene = scenes.find(s => s.id === id);
+        const newName = prompt("Inserisci il nuovo nome della scena:", scene.name);
+        if (newName) { scene.name = newName; renderSceneList(); }
+    }
+
+    function deleteScene(id) {
+        const scene = scenes.find(s => s.id === id);
+        if (confirm(`Sei sicuro di voler eliminare definitivamente la scena "${scene.name}"? L'operazione non può essere annullata.`)) {
+            scenes = scenes.filter(s => s.id !== id);
+            if (scenes.length === 0) createNewScene();
+            else if (currentSceneId === id) switchScene(scenes[0].id);
+            else renderSceneList();
+        }
+    }
+
+    function updateCameraLockUI(scene) {
+        if (scene.cameraLocked) {
+            btnLockCamera.innerText = '🔒 Camera Bloccata';
+            btnLockCamera.style.background = '#d9534f';
+        } else {
+            btnLockCamera.innerText = '🔓 Camera Sbloccata';
+            btnLockCamera.style.background = '#333';
+        }
+    }
+
+    btnLockCamera.onclick = () => {
+        const scene = scenes.find(s => s.id === currentSceneId);
+        if (!scene) return;
+        scene.cameraLocked = !scene.cameraLocked;
+        updateCameraLockUI(scene);
+    };
+
+    function createLayerDOM(imgSrc, naturalWidth, naturalHeight, fogRatio, existingFogData = null) {
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'layer-wrapper';
+                wrapper.style.width = naturalWidth + 'px'; 
+                wrapper.style.height = naturalHeight + 'px';
+                img.className = 'layer-img'; 
+                wrapper.appendChild(img);
+                
+                const canvas = document.createElement('canvas');
+                canvas.className = 'fog-canvas';
+                canvas.width = naturalWidth * fogRatio; 
+                canvas.height = naturalHeight * fogRatio;
+                const ctx = canvas.getContext('2d');
+                wrapper.appendChild(canvas);
+
+                if (existingFogData) {
+                    const fogImg = new Image();
+                    fogImg.onload = () => {
+                        ctx.drawImage(fogImg, 0, 0);
+                        resolve({ wrapper, canvas, ctx });
+                    };
+                    fogImg.src = existingFogData;
+                } else {
+                    resolve({ wrapper, canvas, ctx });
+                }
+            };
+            img.src = imgSrc;
+        });
+    }
+
+    document.getElementById('upload-layer').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        const scene = scenes.find(s => s.id === currentSceneId);
+        if (!file || !scene) return;
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+            loadingOverlay.style.display = 'flex';
+            const imgSrc = event.target.result;
+            
+            const tempImg = new Image();
+            tempImg.onload = async () => {
+                layerCounter++;
+                const nWidth = tempImg.naturalWidth;
+                const nHeight = tempImg.naturalHeight;
+                const fogRatio = Math.max(nWidth, nHeight) > MAX_FOG_RES ? MAX_FOG_RES / Math.max(nWidth, nHeight) : 1;
+
+                const domElements = await createLayerDOM(imgSrc, nWidth, nHeight, fogRatio);
+
+                const newLayer = {
+                    id: layerCounter, name: `Livello ${scene.layers.length + 1}`, 
+                    imgSrc: imgSrc, nWidth: nWidth, nHeight: nHeight,
+                    wrapper: domElements.wrapper, canvas: domElements.canvas, ctx: domElements.ctx, 
+                    fogRatio: fogRatio, x: 0, y: 0, scale: 1, rotation: 0, visible: true, lockMove: false, lockScale: false
+                };
+                
+                if (scene.layers.length === 0) {
+                    const scaleFit = Math.min(window.innerWidth / nWidth, window.innerHeight / nHeight);
+                    scene.scale = scaleFit < 1 ? scaleFit : 1;
+                    scene.panX = (window.innerWidth - (nWidth * scene.scale)) / 2;
+                    scene.panY = (window.innerHeight - (nHeight * scene.scale)) / 2;
+                    applyWorldTransform(scene.panX, scene.panY, scene.scale);
+                }
+
+                scene.layers.push(newLayer);
+                activeLayerId = newLayer.id; 
+                updateToolUI('layer');
+                
+                worldContainer.appendChild(newLayer.wrapper);
+                updateLayerTransform(newLayer);
+                renderLayers();
+                loadingOverlay.style.display = 'none';
+                e.target.value = '';
+            };
+            tempImg.src = imgSrc;
+        };
+        reader.readAsDataURL(file);
+    });
+
+    function updateLayerTransform(layer) {
+        const rot = layer.rotation || 0;
+        layer.wrapper.style.transform = `translate(${layer.x}px, ${layer.y}px) scale(${layer.scale}) rotate(${rot}deg)`;
+        layer.wrapper.style.display = layer.visible ? 'block' : 'none';
+        layer.wrapper.style.zIndex = layer.id;
+    }
+
+    function renameLayer(id) {
+        const scene = scenes.find(s => s.id === currentSceneId);
+        const layer = scene.layers.find(l => l.id === id);
+        const newName = prompt("Inserisci il nuovo nome del livello:", layer.name);
+        if (newName) { layer.name = newName; renderLayers(); }
+    }
+
+    // --- CONTROLLO ROTAZIONE ---
+    document.getElementById('layer-rotation').addEventListener('input', (e) => {
+        const scene = scenes.find(s => s.id === currentSceneId);
+        const layer = scene?.layers.find(l => l.id === activeLayerId);
+        if(layer) {
+            layer.rotation = parseFloat(e.target.value);
+            rotDisplay.innerText = layer.rotation;
+            updateLayerTransform(layer);
+        }
+    });
+
+    document.getElementById('btn-reset-rot').onclick = () => {
+        const scene = scenes.find(s => s.id === currentSceneId);
+        const layer = scene?.layers.find(l => l.id === activeLayerId);
+        if(layer) {
+            layer.rotation = 0;
+            document.getElementById('layer-rotation').value = 0;
+            rotDisplay.innerText = "0";
+            updateLayerTransform(layer);
+        }
+    };
+
+    // --- SALVATAGGIO E CARICAMENTO ---
+    document.getElementById('btn-save-project').onclick = () => {
+        const customFileName = prompt("Inserisci il nome del salvataggio:", "Campagna_Dnd");
+        if (!customFileName) return; 
+
+        loadingOverlay.style.display = 'flex';
+        document.getElementById('loading-text').innerText = "Salvataggio in corso...";
+        
+        setTimeout(() => {
+            try {
+                const projectData = {
+                    sceneCounter: sceneCounter,
+                    layerCounter: layerCounter,
+                    scenes: scenes.map(scene => ({
+                        id: scene.id, name: scene.name, panX: scene.panX, panY: scene.panY, scale: scene.scale, cameraLocked: scene.cameraLocked || false,
+                        layers: scene.layers.map(layer => ({
+                            id: layer.id, name: layer.name, 
+                            imgSrc: layer.imgSrc, nWidth: layer.nWidth, nHeight: layer.nHeight, fogRatio: layer.fogRatio,
+                            fogData: layer.canvas.toDataURL(), 
+                            x: layer.x, y: layer.y, scale: layer.scale, rotation: layer.rotation || 0,
+                            visible: layer.visible, lockMove: layer.lockMove, lockScale: layer.lockScale 
+                        }))
+                    }))
+                };
+
+                const blob = new Blob([JSON.stringify(projectData)], { type: "application/json" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = customFileName.endsWith('.json') ? customFileName : customFileName + ".json";
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            } catch (error) {
+                alert("Errore durante il salvataggio. Il file potrebbe essere troppo grande.");
+            }
+            loadingOverlay.style.display = 'none';
+        }, 100);
+    };
+
+    document.getElementById('btn-load-trigger').onclick = () => document.getElementById('upload-project').click();
+
+    document.getElementById('upload-project').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        loadingOverlay.style.display = 'flex';
+        document.getElementById('loading-text').innerText = "Caricamento mappa e nebbia...";
+        
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+            try {
+                const data = JSON.parse(event.target.result);
+                
+                scenes = [];
+                worldContainer.innerHTML = '';
+                sceneCounter = data.sceneCounter;
+                layerCounter = data.layerCounter;
+
+                for (const sceneData of data.scenes) {
+                    const newScene = {
+                        id: sceneData.id, name: sceneData.name,
+                        panX: sceneData.panX, panY: sceneData.panY, scale: sceneData.scale, cameraLocked: sceneData.cameraLocked || false, layers: []
+                    };
+
+                    for (const layerData of sceneData.layers) {
+                        const domElements = await createLayerDOM(layerData.imgSrc, layerData.nWidth, layerData.nHeight, layerData.fogRatio, layerData.fogData);
+                        
+                        let moveLocked = layerData.lockMove !== undefined ? layerData.lockMove : (layerData.locked || false);
+                        let scaleLocked = layerData.lockScale !== undefined ? layerData.lockScale : (layerData.locked || false);
+
+                        newScene.layers.push({
+                            id: layerData.id, name: layerData.name, 
+                            imgSrc: layerData.imgSrc, nWidth: layerData.nWidth, nHeight: layerData.nHeight, fogRatio: layerData.fogRatio,
+                            wrapper: domElements.wrapper, canvas: domElements.canvas, ctx: domElements.ctx,
+                            x: layerData.x, y: layerData.y, scale: layerData.scale, rotation: layerData.rotation || 0,
+                            visible: layerData.visible, lockMove: moveLocked, lockScale: scaleLocked
+                        });
+                    }
+                    scenes.push(newScene);
+                }
+
+                if (scenes.length > 0) {
+                    switchScene(scenes[0].id);
+                }
+            } catch (error) {
+                alert("Impossibile caricare il file. Assicurati che sia un file di Campagna valido.");
+                console.error(error);
+            }
+            loadingOverlay.style.display = 'none';
+            e.target.value = '';
+        };
+        reader.readAsText(file);
+    });
+
+    // --- RENDER UI ---
+    function renderSceneList() {
+        sceneListEl.innerHTML = '';
+        scenes.forEach(scene => {
+            const row = document.createElement('div'); row.className = `item-row ${scene.id === currentSceneId ? 'active' : ''}`;
+            const nameEl = document.createElement('div'); nameEl.className = 'item-name'; nameEl.innerText = scene.name; nameEl.onclick = () => switchScene(scene.id);
+            const btnEdit = document.createElement('button'); btnEdit.className = 'btn-icon'; btnEdit.innerText = '✏️'; btnEdit.onclick = () => renameScene(scene.id);
+            const btnDel = document.createElement('button'); btnDel.className = 'btn-icon'; btnDel.innerText = '🗑️'; btnDel.onclick = () => deleteScene(scene.id);
+            
+            row.appendChild(nameEl); 
+            row.appendChild(btnEdit); 
+            row.appendChild(btnDel); 
+            sceneListEl.appendChild(row);
+        });
+    }
+
+    function renderLayers() {
+        const scene = scenes.find(s => s.id === currentSceneId);
+        layerListEl.innerHTML = '';
+        const rotSlider = document.getElementById('layer-rotation');
+        
+        if (!scene) {
+            rotSlider.value = 0;
+            rotDisplay.innerText = "0";
+            return;
+        }
+
+        if (activeLayerId) {
+            const activeL = scene.layers.find(l => l.id === activeLayerId);
+            if (activeL) {
+                rotSlider.value = activeL.rotation || 0;
+                rotDisplay.innerText = activeL.rotation || 0;
+            }
+        } else {
+            rotSlider.value = 0;
+            rotDisplay.innerText = "0";
+        }
+
+        [...scene.layers].reverse().forEach(layer => {
+            const row = document.createElement('div'); row.className = `item-row ${layer.id === activeLayerId ? 'active' : ''}`;
+            
+            const nameEl = document.createElement('div'); 
+            nameEl.className = 'item-name'; 
+            nameEl.innerText = layer.name; 
+            nameEl.onclick = () => { 
+                activeLayerId = layer.id; 
+                if(currentMode === 'camera') updateToolUI('layer');
+                else renderLayers(); 
+            };
+            
+            const btnVis = document.createElement('button'); 
+            btnVis.className = `btn-icon ${layer.visible ? '' : 'danger'}`; 
+            btnVis.innerText = layer.visible ? '👁️' : '❌'; 
+            btnVis.title = "Visibilità";
+            btnVis.onclick = () => { layer.visible = !layer.visible; updateLayerTransform(layer); renderLayers(); };
+            
+            const btnLockMove = document.createElement('button'); 
+            btnLockMove.className = `btn-icon ${layer.lockMove ? 'danger' : ''}`; 
+            btnLockMove.innerText = layer.lockMove ? '📍' : '✋'; 
+            btnLockMove.title = "Blocca Movimento";
+            btnLockMove.onclick = () => { layer.lockMove = !layer.lockMove; renderLayers(); };
+
+            const btnLockScale = document.createElement('button'); 
+            btnLockScale.className = `btn-icon ${layer.lockScale ? 'danger' : ''}`; 
+            btnLockScale.innerText = layer.lockScale ? '🔒' : '🔎'; 
+            btnLockScale.title = "Blocca Zoom";
+            btnLockScale.onclick = () => { layer.lockScale = !layer.lockScale; renderLayers(); };
+            
+            const btnRename = document.createElement('button'); btnRename.className = 'btn-icon'; btnRename.innerText = '✏️'; btnRename.onclick = () => renameLayer(layer.id);
+            const btnDel = document.createElement('button'); btnDel.className = 'btn-icon'; btnDel.innerText = '🗑️'; btnDel.onclick = () => { scene.layers = scene.layers.filter(l => l.id !== layer.id); if (activeLayerId === layer.id) activeLayerId = null; layer.wrapper.remove(); renderLayers(); };
+
+            row.appendChild(nameEl); 
+            row.appendChild(btnVis); 
+            row.appendChild(btnLockMove); 
+            row.appendChild(btnLockScale); 
+            row.appendChild(btnRename); 
+            row.appendChild(btnDel);
+            layerListEl.appendChild(row);
+        });
+    }
+
+    // --- TRASFORMAZIONI E STRUMENTI ---
+    function applyWorldTransform(x, y, s) {
+        const scene = scenes.find(sc => sc.id === currentSceneId);
+        if(scene) { scene.panX = x; scene.panY = y; scene.scale = s; }
+        worldContainer.style.transform = `translate(${x}px, ${y}px) scale(${s})`;
+    }
+
+    // Nuova logica di zoom che supporta il transform-origin centrale
+    function scaleLayer(layer, factor, centerX, centerY, scene) {
+        if (layer.lockScale) return;
+        
+        const worldX = (centerX - scene.panX) / scene.scale;
+        const worldY = (centerY - scene.panY) / scene.scale;
+        
+        const cx = layer.x + layer.nWidth / 2;
+        const cy = layer.y + layer.nHeight / 2;
+        
+        const dx = (worldX - cx);
+        const dy = (worldY - cy);
+
+        const newScale = Math.max(0.01, Math.min(layer.scale * factor, 50)); 
+        const actualFactor = newScale / layer.scale;
+        
+        layer.scale = newScale;
+        
+        const newCx = worldX - dx * actualFactor;
+        const newCy = worldY - dy * actualFactor;
+        
+        layer.x = newCx - layer.nWidth / 2;
+        layer.y = newCy - layer.nHeight / 2;
+        
+        updateLayerTransform(layer);
+    }
+
+    function doGlobalZoom(factor, centerX = window.innerWidth/2, centerY = window.innerHeight/2) {
+        const scene = scenes.find(sc => sc.id === currentSceneId);
+        if (!scene || scene.cameraLocked) return; 
+        const worldX = (centerX - scene.panX) / scene.scale;
+        const worldY = (centerY - scene.panY) / scene.scale;
+        let newScale = Math.max(0.05, Math.min(scene.scale * factor, 15));
+        applyWorldTransform(centerX - (worldX * newScale), centerY - (worldY * newScale), newScale);
+    }
+
+    document.getElementById('btn-zoom-in').onclick = () => doGlobalZoom(1.2);
+    document.getElementById('btn-zoom-out').onclick = () => doGlobalZoom(0.8);
+    
+    viewport.addEventListener('wheel', (e) => { 
+        e.preventDefault(); 
+        const factor = e.deltaY < 0 ? 1.1 : 0.9;
+        const scene = scenes.find(sc => sc.id === currentSceneId);
+        const activeLayer = scene?.layers.find(l => l.id === activeLayerId);
+
+        if (currentMode === 'layer' && activeLayer) {
+            scaleLayer(activeLayer, factor, e.clientX, e.clientY, scene);
+        } else {
+            doGlobalZoom(factor, e.clientX, e.clientY);
+        }
+    }, {passive: false});
+
+    const tools = { 'camera': document.getElementById('tool-camera'), 'layer': document.getElementById('tool-layer'), 'draw': document.getElementById('tool-draw'), 'erase': document.getElementById('tool-erase') };
+    
+    function updateToolUI(mode) {
+        currentMode = mode;
+        Object.values(tools).forEach(btn => btn.classList.remove('active'));
+        if(tools[mode]) tools[mode].classList.add('active');
+        
+        if ((mode === 'layer' || mode === 'draw' || mode === 'erase') && !activeLayerId) {
+            const scene = scenes.find(s => s.id === currentSceneId);
+            if (scene && scene.layers.length > 0) {
+                activeLayerId = scene.layers[scene.layers.length - 1].id;
+                renderLayers();
+            }
+        }
+    }
+    
+    Object.keys(tools).forEach(mode => { tools[mode].onclick = () => updateToolUI(mode); });
+    document.getElementById('btn-new-scene').onclick = createNewScene;
+
+    document.getElementById('clear-fog').onclick = () => { const scene = scenes.find(s => s.id === currentSceneId); const layer = scene?.layers.find(l => l.id === activeLayerId); if(layer) layer.ctx.clearRect(0, 0, layer.canvas.width, layer.canvas.height); else alert("Seleziona un livello!"); };
+    document.getElementById('fill-fog').onclick = () => { const scene = scenes.find(s => s.id === currentSceneId); const layer = scene?.layers.find(l => l.id === activeLayerId); if(layer) { layer.ctx.globalCompositeOperation = 'source-over'; layer.ctx.fillStyle = 'black'; layer.ctx.fillRect(0, 0, layer.canvas.width, layer.canvas.height); } else alert("Seleziona un livello!"); };
+
+    // --- INTERAZIONE MATH & TOUCH ---
+    function getPointerPos(e) { return (e.touches && e.touches.length > 0) ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : { x: e.clientX, y: e.clientY }; }
+    function getDist(touches) { return Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY); }
+    function getMid(touches) { return { x: (touches[0].clientX + touches[1].clientX) / 2, y: (touches[0].clientY + touches[1].clientY) / 2 }; }
+
+    // Calcolo preciso con centro asse e rotazione
+    function getLayerLocalCoords(screenX, screenY, scene, layer) {
+        const worldX = (screenX - scene.panX) / scene.scale;
+        const worldY = (screenY - scene.panY) / scene.scale;
+        
+        const cx = layer.x + layer.nWidth / 2;
+        const cy = layer.y + layer.nHeight / 2;
+
+        const dx = (worldX - cx) / layer.scale;
+        const dy = (worldY - cy) / layer.scale;
+
+        const rad = (layer.rotation || 0) * Math.PI / 180;
+        const localX = (layer.nWidth / 2) + dx * Math.cos(rad) + dy * Math.sin(rad);
+        const localY = (layer.nHeight / 2) - dx * Math.sin(rad) + dy * Math.cos(rad);
+
+        return { x: localX * layer.fogRatio, y: localY * layer.fogRatio };
+    }
+
+    function performDraw() {
+        if (!isInteracting || (currentMode !== 'draw' && currentMode !== 'erase')) { pendingDraw = false; return; }
+        const scene = scenes.find(s => s.id === currentSceneId);
+        const layer = scene?.layers.find(l => l.id === activeLayerId);
+        if(layer) { layer.ctx.beginPath(); layer.ctx.moveTo(drawLastX, drawLastY); layer.ctx.lineTo(drawCurrX, drawCurrY); layer.ctx.stroke(); }
+        drawLastX = drawCurrX; drawLastY = drawCurrY;
+        pendingDraw = false;
+    }
+
+    function handleStart(e) {
+        if(e.target.closest('#ui-panel') || e.target.closest('#reveal-ui')) return;
+        
+        const currentTime = new Date().getTime();
+        const tapLength = currentTime - lastTapTime;
+        if (tapLength < 300 && tapLength > 0 && (!e.touches || e.touches.length === 1)) {
+            toggleCinemaMode();
+            e.preventDefault();
+            return;
+        }
+        lastTapTime = currentTime;
+
+        if(!currentSceneId) return;
+        e.preventDefault();
+        
+        const scene = scenes.find(s => s.id === currentSceneId);
+        const activeLayer = scene.layers.find(l => l.id === activeLayerId);
+        isInteracting = true;
+
+        if (e.touches && e.touches.length === 2) {
+            lastPinchDist = getDist(e.touches); lastPinchMid = getMid(e.touches);
+            return;
+        }
+
+        const pos = getPointerPos(e);
+
+        if (currentMode === 'camera') {
+            if (scene.cameraLocked) return; 
+            startX = pos.x - scene.panX; startY = pos.y - scene.panY;
+        } else if (currentMode === 'layer' && activeLayer) {
+            if (!activeLayer.lockMove) {
+                startX = ((pos.x - scene.panX) / scene.scale) - activeLayer.x; 
+                startY = ((pos.y - scene.panY) / scene.scale) - activeLayer.y;
+            }
+        } else if ((currentMode === 'draw' || currentMode === 'erase') && activeLayer) {
+            const localPos = getLayerLocalCoords(pos.x, pos.y, scene, activeLayer);
+            activeLayer.ctx.lineWidth = (document.getElementById('brush-size').value / scene.scale / activeLayer.scale) * activeLayer.fogRatio;
+            activeLayer.ctx.lineCap = 'round'; activeLayer.ctx.lineJoin = 'round';
+            activeLayer.ctx.globalCompositeOperation = currentMode === 'draw' ? 'source-over' : 'destination-out';
+            activeLayer.ctx.strokeStyle = 'black';
+            drawCurrX = drawLastX = localPos.x; drawCurrY = drawLastY = localPos.y;
+            activeLayer.ctx.beginPath(); activeLayer.ctx.moveTo(drawCurrX, drawCurrY); activeLayer.ctx.lineTo(drawCurrX+0.1, drawCurrY+0.1); activeLayer.ctx.stroke();
+        }
+    }
+
+    function handleMove(e) {
+        if (!isInteracting) return;
+        e.preventDefault();
+        const scene = scenes.find(s => s.id === currentSceneId);
+        const activeLayer = scene?.layers.find(l => l.id === activeLayerId);
+
+        if (e.touches && e.touches.length === 2) {
+            const currentDist = getDist(e.touches); const currentMid = getMid(e.touches);
+            if (lastPinchDist) {
+                const zoomFactor = currentDist / lastPinchDist;
+                if (currentMode === 'layer' && activeLayer) {
+                    scaleLayer(activeLayer, zoomFactor, currentMid.x, currentMid.y, scene);
+                } else {
+                    if (scene.cameraLocked) return; 
+                    const worldX = (currentMid.x - scene.panX) / scene.scale; const worldY = (currentMid.y - scene.panY) / scene.scale;
+                    let newScale = Math.max(0.05, Math.min(scene.scale * zoomFactor, 15));
+                    applyWorldTransform(currentMid.x - (worldX * newScale), currentMid.y - (worldY * newScale), newScale);
+                }
+            }
+            lastPinchDist = currentDist; lastPinchMid = currentMid; return;
+        }
+
+        const pos = getPointerPos(e);
+        if (currentMode === 'camera') {
+            if (scene.cameraLocked) return; 
+            applyWorldTransform(pos.x - startX, pos.y - startY, scene.scale);
+        } else if (currentMode === 'layer' && activeLayer) {
+            if (!activeLayer.lockMove) {
+                activeLayer.x = ((pos.x - scene.panX) / scene.scale) - startX; 
+                activeLayer.y = ((pos.y - scene.panY) / scene.scale) - startY; 
+                updateLayerTransform(activeLayer);
+            }
+        } else if ((currentMode === 'draw' || currentMode === 'erase') && activeLayer) {
+            const localPos = getLayerLocalCoords(pos.x, pos.y, scene, activeLayer);
+            drawCurrX = localPos.x; drawCurrY = localPos.y;
+            if (!pendingDraw) { pendingDraw = true; requestAnimationFrame(performDraw); }
+        }
+    }
+
+    function handleEnd(e) {
+        if (e.touches && e.touches.length < 2) { lastPinchDist = null; lastPinchMid = null; }
+        isInteracting = false;
+    }
+
+    viewport.addEventListener('mousedown', handleStart); viewport.addEventListener('mousemove', handleMove); window.addEventListener('mouseup', handleEnd);
+    viewport.addEventListener('touchstart', handleStart, {passive: false}); viewport.addEventListener('touchmove', handleMove, {passive: false});
+    window.addEventListener('touchend', handleEnd); window.addEventListener('touchcancel', handleEnd);
+    
+    viewport.addEventListener('dblclick', (e) => {
+        if(e.target.closest('#ui-panel') || e.target.closest('#reveal-ui')) return;
+        toggleCinemaMode();
+    });
+
+    // --- FULLSCREEN E UI ---
+    document.getElementById('btn-fullscreen').onclick = () => {
+        if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(err => console.log(err));
+        else if (document.exitFullscreen) document.exitFullscreen();
+    };
+
+    const uiPanel = document.getElementById('ui-panel');
+    const revealUiBtn = document.getElementById('reveal-ui');
+
+    document.getElementById('hide-ui').onclick = () => { uiPanel.classList.add('hidden'); revealUiBtn.classList.remove('hidden'); isCinemaMode = false; };
+    revealUiBtn.onclick = () => { uiPanel.classList.remove('hidden'); revealUiBtn.classList.add('hidden'); isCinemaMode = false; };
+
+    function toggleCinemaMode() {
+        isCinemaMode = !isCinemaMode;
+        if (isCinemaMode) { uiPanel.classList.add('hidden'); revealUiBtn.classList.add('hidden'); } 
+        else { revealUiBtn.classList.remove('hidden'); }
+    }
+
+    const calibSquare = document.getElementById('calibration-square');
+    document.getElementById('toggle-square').onclick = () => calibSquare.style.display = (calibSquare.style.display === 'none' || calibSquare.style.display === '') ? 'block' : 'none';
+    document.getElementById('square-size').oninput = (e) => { calibSquare.style.width = e.target.value + 'px'; calibSquare.style.height = e.target.value + 'px'; };
+
+    // Avvio
+    createNewScene();
+</script>
+</body>
+</html>
