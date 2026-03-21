@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>D&D Tavolo Proiettore - V15 Animated</title>
+    <title>D&D Tavolo Proiettore - V16 Zero Lag</title>
     <style>
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #050505; font-family: sans-serif; touch-action: none; color: #eee; }
         
@@ -207,7 +207,6 @@
         updateCameraLockUI(scene);
     };
 
-    // Ora supporta nativamente la creazione di elementi VIDEO
     function createLayerDOM(mediaSrc, naturalWidth, naturalHeight, fogRatio, existingFogData = null, isVideo = false) {
         return new Promise((resolve) => {
             let mediaEl;
@@ -252,6 +251,7 @@
             }
 
             mediaEl.src = mediaSrc;
+            if(isVideo) mediaEl.load();
         });
     }
 
@@ -261,56 +261,62 @@
         if (!file || !scene) return;
         
         const isVideo = file.type.startsWith('video/');
-        const reader = new FileReader();
         
-        reader.onload = async (event) => {
-            loadingOverlay.style.display = 'flex';
-            const mediaSrc = event.target.result;
-            
-            const processMedia = async (nWidth, nHeight) => {
-                layerCounter++;
-                const fogRatio = Math.max(nWidth, nHeight) > MAX_FOG_RES ? MAX_FOG_RES / Math.max(nWidth, nHeight) : 1;
+        // TRUCCO ANTI-LAG: Creiamo un URL temporaneo istantaneo
+        const objectUrl = URL.createObjectURL(file);
+        loadingOverlay.style.display = 'flex';
+        
+        const processMedia = async (nWidth, nHeight) => {
+            layerCounter++;
+            const fogRatio = Math.max(nWidth, nHeight) > MAX_FOG_RES ? MAX_FOG_RES / Math.max(nWidth, nHeight) : 1;
 
-                const domElements = await createLayerDOM(mediaSrc, nWidth, nHeight, fogRatio, null, isVideo);
+            const domElements = await createLayerDOM(objectUrl, nWidth, nHeight, fogRatio, null, isVideo);
 
-                const newLayer = {
-                    id: layerCounter, name: `Livello ${scene.layers.length + 1}`, 
-                    imgSrc: mediaSrc, nWidth: nWidth, nHeight: nHeight,
-                    wrapper: domElements.wrapper, canvas: domElements.canvas, ctx: domElements.ctx, 
-                    fogRatio: fogRatio, x: 0, y: 0, scale: 1, rotation: 0, visible: true, lockMove: false, lockScale: false,
-                    isVideo: isVideo
-                };
-                
-                if (scene.layers.length === 0) {
-                    const scaleFit = Math.min(window.innerWidth / nWidth, window.innerHeight / nHeight);
-                    scene.scale = scaleFit < 1 ? scaleFit : 1;
-                    scene.panX = (window.innerWidth - (nWidth * scene.scale)) / 2;
-                    scene.panY = (window.innerHeight - (nHeight * scene.scale)) / 2;
-                    applyWorldTransform(scene.panX, scene.panY, scene.scale);
-                }
-
-                scene.layers.push(newLayer);
-                activeLayerId = newLayer.id; 
-                updateToolUI('layer');
-                
-                worldContainer.appendChild(newLayer.wrapper);
-                updateLayerTransform(newLayer);
-                renderLayers();
-                loadingOverlay.style.display = 'none';
-                e.target.value = '';
+            const newLayer = {
+                id: layerCounter, name: `Livello ${scene.layers.length + 1}`, 
+                imgSrc: objectUrl, // Assegna provvisoriamente il link istantaneo
+                nWidth: nWidth, nHeight: nHeight,
+                wrapper: domElements.wrapper, canvas: domElements.canvas, ctx: domElements.ctx, 
+                fogRatio: fogRatio, x: 0, y: 0, scale: 1, rotation: 0, visible: true, lockMove: false, lockScale: false,
+                isVideo: isVideo
             };
-
-            if (isVideo) {
-                const tempVid = document.createElement('video');
-                tempVid.onloadedmetadata = () => { processMedia(tempVid.videoWidth, tempVid.videoHeight); };
-                tempVid.src = mediaSrc;
-            } else {
-                const tempImg = new Image();
-                tempImg.onload = () => { processMedia(tempImg.naturalWidth, tempImg.naturalHeight); };
-                tempImg.src = mediaSrc;
+            
+            if (scene.layers.length === 0) {
+                const scaleFit = Math.min(window.innerWidth / nWidth, window.innerHeight / nHeight);
+                scene.scale = scaleFit < 1 ? scaleFit : 1;
+                scene.panX = (window.innerWidth - (nWidth * scene.scale)) / 2;
+                scene.panY = (window.innerHeight - (nHeight * scene.scale)) / 2;
+                applyWorldTransform(scene.panX, scene.panY, scene.scale);
             }
+
+            scene.layers.push(newLayer);
+            activeLayerId = newLayer.id; 
+            updateToolUI('layer');
+            
+            worldContainer.appendChild(newLayer.wrapper);
+            updateLayerTransform(newLayer);
+            renderLayers();
+            loadingOverlay.style.display = 'none';
+            e.target.value = '';
+
+            // ELABORAZIONE IN BACKGROUND PER IL SALVATAGGIO
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                newLayer.imgSrc = ev.target.result; // Sostituisce il link temporaneo col Base64 reale in silenzio
+            };
+            reader.readAsDataURL(file);
         };
-        reader.readAsDataURL(file);
+
+        // Calcola dimensioni e avvia
+        if (isVideo) {
+            const tempVid = document.createElement('video');
+            tempVid.onloadedmetadata = () => { processMedia(tempVid.videoWidth, tempVid.videoHeight); };
+            tempVid.src = objectUrl;
+        } else {
+            const tempImg = new Image();
+            tempImg.onload = () => { processMedia(tempImg.naturalWidth, tempImg.naturalHeight); };
+            tempImg.src = objectUrl;
+        }
     });
 
     function updateLayerTransform(layer) {
@@ -351,6 +357,16 @@
 
     // --- SALVATAGGIO E CARICAMENTO ---
     document.getElementById('btn-save-project').onclick = () => {
+        // Controllo se c'è un file ancora in elaborazione in background
+        for (let s of scenes) {
+            for (let l of s.layers) {
+                if (l.imgSrc && l.imgSrc.startsWith('blob:')) {
+                    alert(`Attendi! Il file "${l.name}" è molto pesante e il tablet lo sta ancora elaborando in background. Riprova tra qualche istante.`);
+                    return;
+                }
+            }
+        }
+
         const customFileName = prompt("Inserisci il nome del salvataggio:", "Campagna_Dnd");
         if (!customFileName) return; 
 
