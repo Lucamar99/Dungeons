@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>D&D Tavolo Proiettore - V16 Zero Lag</title>
+    <title>D&D Tavolo Proiettore - V17 Zero Lag Load</title>
     <style>
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #050505; font-family: sans-serif; touch-action: none; color: #eee; }
         
@@ -262,7 +262,6 @@
         
         const isVideo = file.type.startsWith('video/');
         
-        // TRUCCO ANTI-LAG: Creiamo un URL temporaneo istantaneo
         const objectUrl = URL.createObjectURL(file);
         loadingOverlay.style.display = 'flex';
         
@@ -274,7 +273,7 @@
 
             const newLayer = {
                 id: layerCounter, name: `Livello ${scene.layers.length + 1}`, 
-                imgSrc: objectUrl, // Assegna provvisoriamente il link istantaneo
+                imgSrc: objectUrl, 
                 nWidth: nWidth, nHeight: nHeight,
                 wrapper: domElements.wrapper, canvas: domElements.canvas, ctx: domElements.ctx, 
                 fogRatio: fogRatio, x: 0, y: 0, scale: 1, rotation: 0, visible: true, lockMove: false, lockScale: false,
@@ -299,15 +298,13 @@
             loadingOverlay.style.display = 'none';
             e.target.value = '';
 
-            // ELABORAZIONE IN BACKGROUND PER IL SALVATAGGIO
             const reader = new FileReader();
             reader.onload = (ev) => {
-                newLayer.imgSrc = ev.target.result; // Sostituisce il link temporaneo col Base64 reale in silenzio
+                newLayer.imgSrc = ev.target.result; 
             };
             reader.readAsDataURL(file);
         };
 
-        // Calcola dimensioni e avvia
         if (isVideo) {
             const tempVid = document.createElement('video');
             tempVid.onloadedmetadata = () => { processMedia(tempVid.videoWidth, tempVid.videoHeight); };
@@ -357,7 +354,6 @@
 
     // --- SALVATAGGIO E CARICAMENTO ---
     document.getElementById('btn-save-project').onclick = () => {
-        // Controllo se c'è un file ancora in elaborazione in background
         for (let s of scenes) {
             for (let l of s.layers) {
                 if (l.imgSrc && l.imgSrc.startsWith('blob:')) {
@@ -414,11 +410,14 @@
         if (!file) return;
         
         loadingOverlay.style.display = 'flex';
-        document.getElementById('loading-text').innerText = "Caricamento mappa e nebbia...";
+        document.getElementById('loading-text').innerText = "Lettura del file in corso...";
         
         const reader = new FileReader();
         reader.onload = async (event) => {
             try {
+                document.getElementById('loading-text').innerText = "Elaborazione dati...";
+                await new Promise(resolve => setTimeout(resolve, 50));
+
                 const data = JSON.parse(event.target.result);
                 
                 scenes = [];
@@ -426,7 +425,18 @@
                 sceneCounter = data.sceneCounter;
                 layerCounter = data.layerCounter;
 
+                // TRUCCO ANTI-LAG PER IL CARICAMENTO
+                const base64ToBlobUrl = async (b64) => {
+                    if(!b64 || !b64.startsWith('data:')) return b64;
+                    const res = await fetch(b64);
+                    const blob = await res.blob();
+                    return URL.createObjectURL(blob);
+                };
+
                 for (const sceneData of data.scenes) {
+                    document.getElementById('loading-text').innerText = `Caricamento ${sceneData.name}...`;
+                    await new Promise(resolve => setTimeout(resolve, 50));
+
                     const newScene = {
                         id: sceneData.id, name: sceneData.name,
                         panX: sceneData.panX, panY: sceneData.panY, scale: sceneData.scale, cameraLocked: sceneData.cameraLocked || false, layers: []
@@ -434,14 +444,20 @@
 
                     for (const layerData of sceneData.layers) {
                         const isVid = layerData.isVideo || false;
-                        const domElements = await createLayerDOM(layerData.imgSrc, layerData.nWidth, layerData.nHeight, layerData.fogRatio, layerData.fogData, isVid);
+
+                        // Usa il trucco Blob URL per alleggerire istantaneamente il DOM
+                        const domSrc = await base64ToBlobUrl(layerData.imgSrc);
+                        const domFog = layerData.fogData ? await base64ToBlobUrl(layerData.fogData) : null;
+
+                        const domElements = await createLayerDOM(domSrc, layerData.nWidth, layerData.nHeight, layerData.fogRatio, domFog, isVid);
                         
                         let moveLocked = layerData.lockMove !== undefined ? layerData.lockMove : (layerData.locked || false);
                         let scaleLocked = layerData.lockScale !== undefined ? layerData.lockScale : (layerData.locked || false);
 
                         newScene.layers.push({
                             id: layerData.id, name: layerData.name, 
-                            imgSrc: layerData.imgSrc, nWidth: layerData.nWidth, nHeight: layerData.nHeight, fogRatio: layerData.fogRatio,
+                            imgSrc: layerData.imgSrc, // Mantiene il vero Base64 nella memoria RAM per i salvataggi
+                            nWidth: layerData.nWidth, nHeight: layerData.nHeight, fogRatio: layerData.fogRatio,
                             wrapper: domElements.wrapper, canvas: domElements.canvas, ctx: domElements.ctx,
                             x: layerData.x, y: layerData.y, scale: layerData.scale, rotation: layerData.rotation || 0,
                             visible: layerData.visible, lockMove: moveLocked, lockScale: scaleLocked,
