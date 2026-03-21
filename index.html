@@ -3,14 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>D&D Tavolo Proiettore - V14 Center Rotation</title>
+    <title>D&D Tavolo Proiettore - V15 Animated</title>
     <style>
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #050505; font-family: sans-serif; touch-action: none; color: #eee; }
         
         #viewport { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
         #world-container { position: absolute; top: 0; left: 0; transform-origin: 0 0; will-change: transform; width: 0; height: 0; }
         
-        /* L'asse di rotazione e scala è ora impostato esattamente al centro del layer */
         .layer-wrapper { position: absolute; top: 0; left: 0; transform-origin: center; will-change: transform; }
         .layer-img { width: 100%; height: 100%; object-fit: fill; display: block; pointer-events: none; }
         .fog-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
@@ -73,7 +72,7 @@
     
     <div id="scene-controls" class="hidden">
         <h3>1. Livelli (Layer)</h3>
-        <input type="file" id="upload-layer" accept="image/*">
+        <input type="file" id="upload-layer" accept="image/*,video/*">
         <div class="list-container" id="layer-list"></div>
 
         <h3>2. Strumenti</h3>
@@ -208,16 +207,30 @@
         updateCameraLockUI(scene);
     };
 
-    function createLayerDOM(imgSrc, naturalWidth, naturalHeight, fogRatio, existingFogData = null) {
+    // Ora supporta nativamente la creazione di elementi VIDEO
+    function createLayerDOM(mediaSrc, naturalWidth, naturalHeight, fogRatio, existingFogData = null, isVideo = false) {
         return new Promise((resolve) => {
-            const img = new Image();
-            img.onload = () => {
+            let mediaEl;
+            
+            if (isVideo) {
+                mediaEl = document.createElement('video');
+                mediaEl.autoplay = true;
+                mediaEl.loop = true;
+                mediaEl.muted = true;
+                mediaEl.playsInline = true;
+                mediaEl.onloadeddata = finalizeDOM;
+            } else {
+                mediaEl = new Image();
+                mediaEl.onload = finalizeDOM;
+            }
+
+            function finalizeDOM() {
                 const wrapper = document.createElement('div');
                 wrapper.className = 'layer-wrapper';
                 wrapper.style.width = naturalWidth + 'px'; 
                 wrapper.style.height = naturalHeight + 'px';
-                img.className = 'layer-img'; 
-                wrapper.appendChild(img);
+                mediaEl.className = 'layer-img'; 
+                wrapper.appendChild(mediaEl);
                 
                 const canvas = document.createElement('canvas');
                 canvas.className = 'fog-canvas';
@@ -230,14 +243,15 @@
                     const fogImg = new Image();
                     fogImg.onload = () => {
                         ctx.drawImage(fogImg, 0, 0);
-                        resolve({ wrapper, canvas, ctx });
+                        resolve({ wrapper, canvas, ctx, mediaEl });
                     };
                     fogImg.src = existingFogData;
                 } else {
-                    resolve({ wrapper, canvas, ctx });
+                    resolve({ wrapper, canvas, ctx, mediaEl });
                 }
-            };
-            img.src = imgSrc;
+            }
+
+            mediaEl.src = mediaSrc;
         });
     }
 
@@ -245,25 +259,26 @@
         const file = e.target.files[0];
         const scene = scenes.find(s => s.id === currentSceneId);
         if (!file || !scene) return;
+        
+        const isVideo = file.type.startsWith('video/');
         const reader = new FileReader();
+        
         reader.onload = async (event) => {
             loadingOverlay.style.display = 'flex';
-            const imgSrc = event.target.result;
+            const mediaSrc = event.target.result;
             
-            const tempImg = new Image();
-            tempImg.onload = async () => {
+            const processMedia = async (nWidth, nHeight) => {
                 layerCounter++;
-                const nWidth = tempImg.naturalWidth;
-                const nHeight = tempImg.naturalHeight;
                 const fogRatio = Math.max(nWidth, nHeight) > MAX_FOG_RES ? MAX_FOG_RES / Math.max(nWidth, nHeight) : 1;
 
-                const domElements = await createLayerDOM(imgSrc, nWidth, nHeight, fogRatio);
+                const domElements = await createLayerDOM(mediaSrc, nWidth, nHeight, fogRatio, null, isVideo);
 
                 const newLayer = {
                     id: layerCounter, name: `Livello ${scene.layers.length + 1}`, 
-                    imgSrc: imgSrc, nWidth: nWidth, nHeight: nHeight,
+                    imgSrc: mediaSrc, nWidth: nWidth, nHeight: nHeight,
                     wrapper: domElements.wrapper, canvas: domElements.canvas, ctx: domElements.ctx, 
-                    fogRatio: fogRatio, x: 0, y: 0, scale: 1, rotation: 0, visible: true, lockMove: false, lockScale: false
+                    fogRatio: fogRatio, x: 0, y: 0, scale: 1, rotation: 0, visible: true, lockMove: false, lockScale: false,
+                    isVideo: isVideo
                 };
                 
                 if (scene.layers.length === 0) {
@@ -284,7 +299,16 @@
                 loadingOverlay.style.display = 'none';
                 e.target.value = '';
             };
-            tempImg.src = imgSrc;
+
+            if (isVideo) {
+                const tempVid = document.createElement('video');
+                tempVid.onloadedmetadata = () => { processMedia(tempVid.videoWidth, tempVid.videoHeight); };
+                tempVid.src = mediaSrc;
+            } else {
+                const tempImg = new Image();
+                tempImg.onload = () => { processMedia(tempImg.naturalWidth, tempImg.naturalHeight); };
+                tempImg.src = mediaSrc;
+            }
         };
         reader.readAsDataURL(file);
     });
@@ -345,7 +369,8 @@
                             imgSrc: layer.imgSrc, nWidth: layer.nWidth, nHeight: layer.nHeight, fogRatio: layer.fogRatio,
                             fogData: layer.canvas.toDataURL(), 
                             x: layer.x, y: layer.y, scale: layer.scale, rotation: layer.rotation || 0,
-                            visible: layer.visible, lockMove: layer.lockMove, lockScale: layer.lockScale 
+                            visible: layer.visible, lockMove: layer.lockMove, lockScale: layer.lockScale,
+                            isVideo: layer.isVideo || false
                         }))
                     }))
                 };
@@ -392,7 +417,8 @@
                     };
 
                     for (const layerData of sceneData.layers) {
-                        const domElements = await createLayerDOM(layerData.imgSrc, layerData.nWidth, layerData.nHeight, layerData.fogRatio, layerData.fogData);
+                        const isVid = layerData.isVideo || false;
+                        const domElements = await createLayerDOM(layerData.imgSrc, layerData.nWidth, layerData.nHeight, layerData.fogRatio, layerData.fogData, isVid);
                         
                         let moveLocked = layerData.lockMove !== undefined ? layerData.lockMove : (layerData.locked || false);
                         let scaleLocked = layerData.lockScale !== undefined ? layerData.lockScale : (layerData.locked || false);
@@ -402,7 +428,8 @@
                             imgSrc: layerData.imgSrc, nWidth: layerData.nWidth, nHeight: layerData.nHeight, fogRatio: layerData.fogRatio,
                             wrapper: domElements.wrapper, canvas: domElements.canvas, ctx: domElements.ctx,
                             x: layerData.x, y: layerData.y, scale: layerData.scale, rotation: layerData.rotation || 0,
-                            visible: layerData.visible, lockMove: moveLocked, lockScale: scaleLocked
+                            visible: layerData.visible, lockMove: moveLocked, lockScale: scaleLocked,
+                            isVideo: isVid
                         });
                     }
                     scenes.push(newScene);
@@ -464,7 +491,7 @@
             
             const nameEl = document.createElement('div'); 
             nameEl.className = 'item-name'; 
-            nameEl.innerText = layer.name; 
+            nameEl.innerText = layer.name + (layer.isVideo ? " 🎥" : ""); 
             nameEl.onclick = () => { 
                 activeLayerId = layer.id; 
                 if(currentMode === 'camera') updateToolUI('layer');
@@ -509,7 +536,6 @@
         worldContainer.style.transform = `translate(${x}px, ${y}px) scale(${s})`;
     }
 
-    // Nuova logica di zoom che supporta il transform-origin centrale
     function scaleLayer(layer, factor, centerX, centerY, scene) {
         if (layer.lockScale) return;
         
@@ -588,7 +614,6 @@
     function getDist(touches) { return Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY); }
     function getMid(touches) { return { x: (touches[0].clientX + touches[1].clientX) / 2, y: (touches[0].clientY + touches[1].clientY) / 2 }; }
 
-    // Calcolo preciso con centro asse e rotazione
     function getLayerLocalCoords(screenX, screenY, scene, layer) {
         const worldX = (screenX - scene.panX) / scene.scale;
         const worldY = (screenY - scene.panY) / scene.scale;
