@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>D&D Tavolo Proiettore - V18 Smart Links</title>
+    <title>D&D Tavolo Proiettore - Vercel Edition</title>
     <style>
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #050505; font-family: sans-serif; touch-action: none; color: #eee; }
         
@@ -128,6 +128,9 @@
 </div>
 
 <script>
+// Incapsuliamo tutto per renderlo sicuro sui server remoti come Vercel
+window.addEventListener('DOMContentLoaded', () => {
+
     // --- STATO ARCHITETTURA ---
     let scenes = [];
     let currentSceneId = null;
@@ -136,7 +139,7 @@
     let layerCounter = 0;
     const MAX_FOG_RES = 1500;
 
-    let layerToRelink = null; // Variabile per tracciare quale livello stiamo ricaricando
+    let layerToRelink = null;
 
     // --- DOM ---
     const viewport = document.getElementById('viewport');
@@ -157,6 +160,24 @@
     let drawLastX = 0, drawLastY = 0, drawCurrX = 0, drawCurrY = 0;
     let lastTapTime = 0;
     let isCinemaMode = false;
+
+    // --- FUNZIONI DI SICUREZZA PER SERVER (No Fetch) ---
+    function safeBase64ToBlobUrl(b64) {
+        if(!b64 || !b64.startsWith('data:')) return b64;
+        try {
+            const parts = b64.split(',');
+            const mime = parts[0].match(/:(.*?);/)[1];
+            const bstr = atob(parts[1]);
+            let n = bstr.length;
+            const u8arr = new Uint8Array(n);
+            while(n--){ u8arr[n] = bstr.charCodeAt(n); }
+            const blob = new Blob([u8arr], {type: mime});
+            return URL.createObjectURL(blob);
+        } catch(e) {
+            console.error("Errore di decodifica, probabile blocco di sicurezza del browser", e);
+            return b64;
+        }
+    }
 
     // --- SCENE E LAYER ---
     function createNewScene() {
@@ -222,13 +243,12 @@
                 mediaEl.loop = true;
                 mediaEl.muted = true;
                 mediaEl.playsInline = true;
-                mediaEl.style.backgroundColor = "#222"; // Placeholder se manca il video
+                mediaEl.style.backgroundColor = "#222"; 
                 if (mediaSrc) {
                     mediaEl.onloadeddata = finalizeDOM;
                     mediaEl.src = mediaSrc;
                     mediaEl.load();
                 } else {
-                    // Video assente (caricato da JSON)
                     setTimeout(finalizeDOM, 10);
                 }
             } else {
@@ -276,7 +296,7 @@
         if (!file || !scene) return;
         
         const isVideo = file.type.startsWith('video/');
-        const objectUrl = URL.createObjectURL(file); // Trucco per velocità istantanea
+        const objectUrl = URL.createObjectURL(file);
         loadingOverlay.style.display = 'flex';
         
         const processMedia = async (nWidth, nHeight) => {
@@ -288,8 +308,8 @@
             const newLayer = {
                 id: layerCounter, 
                 name: `Livello ${scene.layers.length + 1}`, 
-                fileName: file.name, // Salviamo il nome del file per il relink
-                imgSrc: isVideo ? null : objectUrl, // SE E' VIDEO, NON LO SALVEREMO NEL JSON
+                fileName: file.name,
+                imgSrc: isVideo ? null : objectUrl, 
                 nWidth: nWidth, nHeight: nHeight,
                 wrapper: domElements.wrapper, canvas: domElements.canvas, ctx: domElements.ctx, mediaEl: domElements.mediaEl,
                 fogRatio: fogRatio, x: 0, y: 0, scale: 1, rotation: 0, visible: true, lockMove: false, lockScale: false,
@@ -314,7 +334,6 @@
             loadingOverlay.style.display = 'none';
             e.target.value = '';
 
-            // Se è un'immagine normale, elaboriamo il Base64 in background per salvarlo. Se è video, no!
             if (!isVideo) {
                 const reader = new FileReader();
                 reader.onload = (ev) => { newLayer.imgSrc = ev.target.result; };
@@ -377,7 +396,7 @@
         const objectUrl = URL.createObjectURL(file);
         layerToRelink.mediaEl.src = objectUrl;
         layerToRelink.mediaEl.load();
-        layerToRelink.needsRelink = false; // Video ripristinato!
+        layerToRelink.needsRelink = false; 
         layerToRelink = null;
         renderLayers();
         e.target.value = '';
@@ -385,11 +404,20 @@
 
     // --- SALVATAGGIO E CARICAMENTO ---
     document.getElementById('btn-save-project').onclick = () => {
+        for (let s of scenes) {
+            for (let l of s.layers) {
+                if (l.imgSrc && l.imgSrc.startsWith('blob:')) {
+                    alert(`Attendi! Il file "${l.name}" è molto pesante e il tablet lo sta ancora elaborando in background. Riprova tra qualche istante.`);
+                    return;
+                }
+            }
+        }
+
         const customFileName = prompt("Inserisci il nome del salvataggio:", "Campagna_Dnd");
         if (!customFileName) return; 
 
         loadingOverlay.style.display = 'flex';
-        document.getElementById('loading-text').innerText = "Salvataggio super-veloce in corso...";
+        document.getElementById('loading-text').innerText = "Salvataggio in corso...";
         
         setTimeout(() => {
             try {
@@ -400,9 +428,9 @@
                         id: scene.id, name: scene.name, panX: scene.panX, panY: scene.panY, scale: scene.scale, cameraLocked: scene.cameraLocked || false,
                         layers: scene.layers.map(layer => ({
                             id: layer.id, name: layer.name, fileName: layer.fileName || "Media",
-                            imgSrc: layer.imgSrc, // Se è video, questo sarà 'null' (Zero Lag)
+                            imgSrc: layer.imgSrc, 
                             nWidth: layer.nWidth, nHeight: layer.nHeight, fogRatio: layer.fogRatio,
-                            fogData: layer.canvas.toDataURL(), // Salva solo la nebbia
+                            fogData: layer.canvas.toDataURL(), 
                             x: layer.x, y: layer.y, scale: layer.scale, rotation: layer.rotation || 0,
                             visible: layer.visible, lockMove: layer.lockMove, lockScale: layer.lockScale,
                             isVideo: layer.isVideo || false
@@ -433,7 +461,7 @@
         if (!file) return;
         
         loadingOverlay.style.display = 'flex';
-        document.getElementById('loading-text').innerText = "Caricamento istantaneo mappa e nebbia...";
+        document.getElementById('loading-text').innerText = "Caricamento istantaneo...";
         
         const reader = new FileReader();
         reader.onload = async (event) => {
@@ -446,13 +474,6 @@
                 sceneCounter = data.sceneCounter;
                 layerCounter = data.layerCounter;
 
-                const base64ToBlobUrl = async (b64) => {
-                    if(!b64 || !b64.startsWith('data:')) return b64;
-                    const res = await fetch(b64);
-                    const blob = await res.blob();
-                    return URL.createObjectURL(blob);
-                };
-
                 for (const sceneData of data.scenes) {
                     const newScene = {
                         id: sceneData.id, name: sceneData.name,
@@ -461,10 +482,11 @@
 
                     for (const layerData of sceneData.layers) {
                         const isVid = layerData.isVideo || false;
-                        const needsRelink = isVid && !layerData.imgSrc; // Se manca il video (comportamento voluto per anti-lag)
+                        const needsRelink = isVid && !layerData.imgSrc; 
 
-                        const domSrc = await base64ToBlobUrl(layerData.imgSrc);
-                        const domFog = layerData.fogData ? await base64ToBlobUrl(layerData.fogData) : null;
+                        // Uso la funzione sicura invece di fetch()
+                        const domSrc = safeBase64ToBlobUrl(layerData.imgSrc);
+                        const domFog = layerData.fogData ? safeBase64ToBlobUrl(layerData.fogData) : null;
 
                         const domElements = await createLayerDOM(domSrc, layerData.nWidth, layerData.nHeight, layerData.fogRatio, domFog, isVid);
                         
@@ -541,15 +563,18 @@
             };
             
             const btnVis = document.createElement('button'); 
-            btnVis.className = `btn-icon ${layer.visible ? '' : 'danger'}`; btnVis.innerText = layer.visible ? '👁️' : '❌'; 
+            btnVis.className = `btn-icon ${layer.visible ? '' : 'danger'}`; 
+            btnVis.innerText = layer.visible ? '👁️' : '❌'; 
             btnVis.title = "Visibilità"; btnVis.onclick = () => { layer.visible = !layer.visible; updateLayerTransform(layer); renderLayers(); };
             
             const btnLockMove = document.createElement('button'); 
-            btnLockMove.className = `btn-icon ${layer.lockMove ? 'danger' : ''}`; btnLockMove.innerText = layer.lockMove ? '📍' : '✋'; 
+            btnLockMove.className = `btn-icon ${layer.lockMove ? 'danger' : ''}`; 
+            btnLockMove.innerText = layer.lockMove ? '📍' : '✋'; 
             btnLockMove.title = "Blocca Movimento"; btnLockMove.onclick = () => { layer.lockMove = !layer.lockMove; renderLayers(); };
 
             const btnLockScale = document.createElement('button'); 
-            btnLockScale.className = `btn-icon ${layer.lockScale ? 'danger' : ''}`; btnLockScale.innerText = layer.lockScale ? '🔒' : '🔎'; 
+            btnLockScale.className = `btn-icon ${layer.lockScale ? 'danger' : ''}`; 
+            btnLockScale.innerText = layer.lockScale ? '🔒' : '🔎'; 
             btnLockScale.title = "Blocca Zoom"; btnLockScale.onclick = () => { layer.lockScale = !layer.lockScale; renderLayers(); };
             
             const btnRename = document.createElement('button'); btnRename.className = 'btn-icon'; btnRename.innerText = '✏️'; btnRename.onclick = () => renameLayer(layer.id);
@@ -557,7 +582,6 @@
 
             row.appendChild(nameEl); row.appendChild(btnVis); row.appendChild(btnLockMove); row.appendChild(btnLockScale); row.appendChild(btnRename); row.appendChild(btnDel);
             
-            // Seleziona se aggiungere il bottone di Ricarica Video
             if (layer.needsRelink) {
                 const btnRelink = document.createElement('button');
                 btnRelink.className = 'btn-relink';
@@ -686,7 +710,9 @@
         const currentTime = new Date().getTime();
         const tapLength = currentTime - lastTapTime;
         if (tapLength < 300 && tapLength > 0 && (!e.touches || e.touches.length === 1)) {
-            toggleCinemaMode(); e.preventDefault(); return;
+            toggleCinemaMode();
+            e.preventDefault();
+            return;
         }
         lastTapTime = currentTime;
 
@@ -797,8 +823,11 @@
     document.getElementById('toggle-square').onclick = () => calibSquare.style.display = (calibSquare.style.display === 'none' || calibSquare.style.display === '') ? 'block' : 'none';
     document.getElementById('square-size').oninput = (e) => { calibSquare.style.width = e.target.value + 'px'; calibSquare.style.height = e.target.value + 'px'; };
 
-    // Avvio
+    // Avvio Protetto per Vercel
+    document.getElementById('btn-new-scene').onclick = createNewScene;
     createNewScene();
+
+}); // Fine DOMContentLoaded
 </script>
 </body>
 </html>
