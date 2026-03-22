@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>D&D Tavolo Proiettore - Vercel Edition</title>
+    <title>D&D Tavolo Proiettore - Local YT Patch</title>
     <style>
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #050505; font-family: sans-serif; touch-action: none; color: #eee; }
         
@@ -11,7 +11,7 @@
         #world-container { position: absolute; top: 0; left: 0; transform-origin: 0 0; will-change: transform; width: 0; height: 0; }
         
         .layer-wrapper { position: absolute; top: 0; left: 0; transform-origin: center; will-change: transform; }
-        .layer-img { width: 100%; height: 100%; object-fit: fill; display: block; pointer-events: none; }
+        .layer-img { width: 100%; height: 100%; object-fit: fill; display: block; pointer-events: none; border: none; }
         .fog-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
         
         #calibration-square { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); border: 4px solid #ff3333; background: rgba(255, 51, 51, 0.3); z-index: 100; pointer-events: none; width: 50px; height: 50px; display: none; }
@@ -73,7 +73,11 @@
     
     <div id="scene-controls" class="hidden">
         <h3>1. Livelli (Layer)</h3>
-        <input type="file" id="upload-layer" accept="image/*,video/*">
+        <div class="row">
+            <button id="btn-upload-trigger" style="background: #555;">📁 File Locale</button>
+            <button id="btn-yt-layer" style="background: #cc0000;">🔴 YouTube</button>
+            <input type="file" id="upload-layer" accept="image/*,video/*" class="hidden">
+        </div>
         <div class="list-container" id="layer-list"></div>
 
         <h3>2. Strumenti</h3>
@@ -128,20 +132,16 @@
 </div>
 
 <script>
-// Incapsuliamo tutto per renderlo sicuro sui server remoti come Vercel
 window.addEventListener('DOMContentLoaded', () => {
 
-    // --- STATO ARCHITETTURA ---
     let scenes = [];
     let currentSceneId = null;
     let activeLayerId = null; 
     let sceneCounter = 0;
     let layerCounter = 0;
     const MAX_FOG_RES = 1500;
-
     let layerToRelink = null;
 
-    // --- DOM ---
     const viewport = document.getElementById('viewport');
     const worldContainer = document.getElementById('world-container');
     const sceneListEl = document.getElementById('scene-list');
@@ -151,7 +151,6 @@ window.addEventListener('DOMContentLoaded', () => {
     const btnLockCamera = document.getElementById('btn-lock-camera');
     const rotDisplay = document.getElementById('rot-display');
 
-    // --- INTERAZIONE ---
     let currentMode = 'camera'; 
     let isInteracting = false;
     let startX = 0, startY = 0;
@@ -161,7 +160,6 @@ window.addEventListener('DOMContentLoaded', () => {
     let lastTapTime = 0;
     let isCinemaMode = false;
 
-    // --- FUNZIONI DI SICUREZZA PER SERVER (No Fetch) ---
     function safeBase64ToBlobUrl(b64) {
         if(!b64 || !b64.startsWith('data:')) return b64;
         try {
@@ -174,12 +172,16 @@ window.addEventListener('DOMContentLoaded', () => {
             const blob = new Blob([u8arr], {type: mime});
             return URL.createObjectURL(blob);
         } catch(e) {
-            console.error("Errore di decodifica, probabile blocco di sicurezza del browser", e);
             return b64;
         }
     }
 
-    // --- SCENE E LAYER ---
+    function extractYouTubeID(url) {
+        const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+        const match = url.match(regExp);
+        return (match && match[2].length === 11) ? match[2] : null;
+    }
+
     function createNewScene() {
         sceneCounter++;
         const newScene = { id: sceneCounter, name: `Scena ${sceneCounter}`, layers: [], panX: 0, panY: 0, scale: 1, cameraLocked: false };
@@ -233,11 +235,26 @@ window.addEventListener('DOMContentLoaded', () => {
         updateCameraLockUI(scene);
     };
 
-    function createLayerDOM(mediaSrc, naturalWidth, naturalHeight, fogRatio, existingFogData = null, isVideo = false) {
+    function createLayerDOM(mediaSrc, naturalWidth, naturalHeight, fogRatio, existingFogData = null, isVideo = false, ytId = null) {
         return new Promise((resolve) => {
             let mediaEl;
             
-            if (isVideo) {
+            if (ytId) {
+                mediaEl = document.createElement('iframe');
+                
+                // MENTIAMO AL SISTEMA SULL'ORIGINE SE SIAMO IN LOCALE
+                let currentOrigin = window.location.origin;
+                if (!currentOrigin || currentOrigin === "null" || currentOrigin === "file://") {
+                    currentOrigin = "https://www.youtube.com"; // Fallback sicuro
+                }
+
+                // Usiamo youtube.com standard e passiamo l'origin corretto
+                mediaEl.src = `https://www.youtube.com/embed/${ytId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${ytId}&playsinline=1&modestbranding=1&origin=${currentOrigin}`;
+                mediaEl.allow = "autoplay; encrypted-media";
+                mediaEl.setAttribute("referrerpolicy", "strict-origin-when-cross-origin");
+                mediaEl.style.backgroundColor = "#000";
+                setTimeout(finalizeDOM, 50); 
+            } else if (isVideo) {
                 mediaEl = document.createElement('video');
                 mediaEl.autoplay = true;
                 mediaEl.loop = true;
@@ -290,6 +307,46 @@ window.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    document.getElementById('btn-upload-trigger').onclick = () => document.getElementById('upload-layer').click();
+
+    document.getElementById('btn-yt-layer').onclick = async () => {
+        const url = prompt("Incolla qui il link del video di YouTube:");
+        if (!url) return;
+        
+        const ytId = extractYouTubeID(url);
+        if (!ytId) {
+            alert("Link non valido! Assicurati che sia un link corretto di YouTube.");
+            return;
+        }
+
+        const scene = scenes.find(s => s.id === currentSceneId);
+        if (!scene) return;
+
+        loadingOverlay.style.display = 'flex';
+        
+        const nWidth = 1920;
+        const nHeight = 1080;
+        const fogRatio = MAX_FOG_RES / Math.max(nWidth, nHeight);
+
+        const domElements = await createLayerDOM(null, nWidth, nHeight, fogRatio, null, false, ytId);
+
+        layerCounter++;
+        const newLayer = {
+            id: layerCounter, 
+            name: `YouTube Mappa`, 
+            fileName: `YT: ${ytId}`,
+            imgSrc: null, 
+            ytId: ytId, 
+            nWidth: nWidth, nHeight: nHeight,
+            wrapper: domElements.wrapper, canvas: domElements.canvas, ctx: domElements.ctx, mediaEl: domElements.mediaEl,
+            fogRatio: fogRatio, x: 0, y: 0, scale: 1, rotation: 0, visible: true, lockMove: false, lockScale: false,
+            isVideo: false, needsRelink: false
+        };
+        
+        finalizeLayerAddition(scene, newLayer, nWidth, nHeight);
+        loadingOverlay.style.display = 'none';
+    };
+
     document.getElementById('upload-layer').addEventListener('change', (e) => {
         const file = e.target.files[0];
         const scene = scenes.find(s => s.id === currentSceneId);
@@ -300,37 +357,23 @@ window.addEventListener('DOMContentLoaded', () => {
         loadingOverlay.style.display = 'flex';
         
         const processMedia = async (nWidth, nHeight) => {
-            layerCounter++;
             const fogRatio = Math.max(nWidth, nHeight) > MAX_FOG_RES ? MAX_FOG_RES / Math.max(nWidth, nHeight) : 1;
-
             const domElements = await createLayerDOM(objectUrl, nWidth, nHeight, fogRatio, null, isVideo);
 
+            layerCounter++;
             const newLayer = {
                 id: layerCounter, 
                 name: `Livello ${scene.layers.length + 1}`, 
                 fileName: file.name,
                 imgSrc: isVideo ? null : objectUrl, 
+                ytId: null,
                 nWidth: nWidth, nHeight: nHeight,
                 wrapper: domElements.wrapper, canvas: domElements.canvas, ctx: domElements.ctx, mediaEl: domElements.mediaEl,
                 fogRatio: fogRatio, x: 0, y: 0, scale: 1, rotation: 0, visible: true, lockMove: false, lockScale: false,
                 isVideo: isVideo, needsRelink: false
             };
             
-            if (scene.layers.length === 0) {
-                const scaleFit = Math.min(window.innerWidth / nWidth, window.innerHeight / nHeight);
-                scene.scale = scaleFit < 1 ? scaleFit : 1;
-                scene.panX = (window.innerWidth - (nWidth * scene.scale)) / 2;
-                scene.panY = (window.innerHeight - (nHeight * scene.scale)) / 2;
-                applyWorldTransform(scene.panX, scene.panY, scene.scale);
-            }
-
-            scene.layers.push(newLayer);
-            activeLayerId = newLayer.id; 
-            updateToolUI('layer');
-            
-            worldContainer.appendChild(newLayer.wrapper);
-            updateLayerTransform(newLayer);
-            renderLayers();
+            finalizeLayerAddition(scene, newLayer, nWidth, nHeight);
             loadingOverlay.style.display = 'none';
             e.target.value = '';
 
@@ -352,6 +395,24 @@ window.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    function finalizeLayerAddition(scene, newLayer, nWidth, nHeight) {
+        if (scene.layers.length === 0) {
+            const scaleFit = Math.min(window.innerWidth / nWidth, window.innerHeight / nHeight);
+            scene.scale = scaleFit < 1 ? scaleFit : 1;
+            scene.panX = (window.innerWidth - (nWidth * scene.scale)) / 2;
+            scene.panY = (window.innerHeight - (nHeight * scene.scale)) / 2;
+            applyWorldTransform(scene.panX, scene.panY, scene.scale);
+        }
+
+        scene.layers.push(newLayer);
+        activeLayerId = newLayer.id; 
+        updateToolUI('layer');
+        
+        worldContainer.appendChild(newLayer.wrapper);
+        updateLayerTransform(newLayer);
+        renderLayers();
+    }
+
     function updateLayerTransform(layer) {
         const rot = layer.rotation || 0;
         layer.wrapper.style.transform = `translate(${layer.x}px, ${layer.y}px) scale(${layer.scale}) rotate(${rot}deg)`;
@@ -366,7 +427,6 @@ window.addEventListener('DOMContentLoaded', () => {
         if (newName) { layer.name = newName; renderLayers(); }
     }
 
-    // --- CONTROLLO ROTAZIONE ---
     document.getElementById('layer-rotation').addEventListener('input', (e) => {
         const scene = scenes.find(s => s.id === currentSceneId);
         const layer = scene?.layers.find(l => l.id === activeLayerId);
@@ -388,7 +448,6 @@ window.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // --- LOGICA RELINK VIDEO ---
     document.getElementById('upload-relink').addEventListener('change', (e) => {
         const file = e.target.files[0];
         if (!file || !layerToRelink) return;
@@ -402,12 +461,11 @@ window.addEventListener('DOMContentLoaded', () => {
         e.target.value = '';
     });
 
-    // --- SALVATAGGIO E CARICAMENTO ---
     document.getElementById('btn-save-project').onclick = () => {
         for (let s of scenes) {
             for (let l of s.layers) {
                 if (l.imgSrc && l.imgSrc.startsWith('blob:')) {
-                    alert(`Attendi! Il file "${l.name}" è molto pesante e il tablet lo sta ancora elaborando in background. Riprova tra qualche istante.`);
+                    alert(`Attendi! Il file "${l.name}" è ancora in elaborazione background. Riprova tra qualche istante.`);
                     return;
                 }
             }
@@ -428,7 +486,7 @@ window.addEventListener('DOMContentLoaded', () => {
                         id: scene.id, name: scene.name, panX: scene.panX, panY: scene.panY, scale: scene.scale, cameraLocked: scene.cameraLocked || false,
                         layers: scene.layers.map(layer => ({
                             id: layer.id, name: layer.name, fileName: layer.fileName || "Media",
-                            imgSrc: layer.imgSrc, 
+                            imgSrc: layer.imgSrc, ytId: layer.ytId || null, 
                             nWidth: layer.nWidth, nHeight: layer.nHeight, fogRatio: layer.fogRatio,
                             fogData: layer.canvas.toDataURL(), 
                             x: layer.x, y: layer.y, scale: layer.scale, rotation: layer.rotation || 0,
@@ -461,7 +519,7 @@ window.addEventListener('DOMContentLoaded', () => {
         if (!file) return;
         
         loadingOverlay.style.display = 'flex';
-        document.getElementById('loading-text').innerText = "Caricamento istantaneo...";
+        document.getElementById('loading-text').innerText = "Caricamento mappa e nebbia...";
         
         const reader = new FileReader();
         reader.onload = async (event) => {
@@ -474,6 +532,13 @@ window.addEventListener('DOMContentLoaded', () => {
                 sceneCounter = data.sceneCounter;
                 layerCounter = data.layerCounter;
 
+                const base64ToBlobUrl = async (b64) => {
+                    if(!b64 || !b64.startsWith('data:')) return b64;
+                    const res = await fetch(b64);
+                    const blob = await res.blob();
+                    return URL.createObjectURL(blob);
+                };
+
                 for (const sceneData of data.scenes) {
                     const newScene = {
                         id: sceneData.id, name: sceneData.name,
@@ -482,20 +547,20 @@ window.addEventListener('DOMContentLoaded', () => {
 
                     for (const layerData of sceneData.layers) {
                         const isVid = layerData.isVideo || false;
-                        const needsRelink = isVid && !layerData.imgSrc; 
+                        const ytId = layerData.ytId || null;
+                        const needsRelink = isVid && !layerData.imgSrc && !ytId; 
 
-                        // Uso la funzione sicura invece di fetch()
                         const domSrc = safeBase64ToBlobUrl(layerData.imgSrc);
                         const domFog = layerData.fogData ? safeBase64ToBlobUrl(layerData.fogData) : null;
 
-                        const domElements = await createLayerDOM(domSrc, layerData.nWidth, layerData.nHeight, layerData.fogRatio, domFog, isVid);
+                        const domElements = await createLayerDOM(domSrc, layerData.nWidth, layerData.nHeight, layerData.fogRatio, domFog, isVid, ytId);
                         
                         let moveLocked = layerData.lockMove !== undefined ? layerData.lockMove : (layerData.locked || false);
                         let scaleLocked = layerData.lockScale !== undefined ? layerData.lockScale : (layerData.locked || false);
 
                         newScene.layers.push({
                             id: layerData.id, name: layerData.name, fileName: layerData.fileName,
-                            imgSrc: layerData.imgSrc, nWidth: layerData.nWidth, nHeight: layerData.nHeight, fogRatio: layerData.fogRatio,
+                            imgSrc: layerData.imgSrc, ytId: ytId, nWidth: layerData.nWidth, nHeight: layerData.nHeight, fogRatio: layerData.fogRatio,
                             wrapper: domElements.wrapper, canvas: domElements.canvas, ctx: domElements.ctx, mediaEl: domElements.mediaEl,
                             x: layerData.x, y: layerData.y, scale: layerData.scale, rotation: layerData.rotation || 0,
                             visible: layerData.visible, lockMove: moveLocked, lockScale: scaleLocked,
@@ -517,7 +582,6 @@ window.addEventListener('DOMContentLoaded', () => {
         reader.readAsText(file);
     });
 
-    // --- RENDER UI ---
     function renderSceneList() {
         sceneListEl.innerHTML = '';
         scenes.forEach(scene => {
@@ -555,7 +619,7 @@ window.addEventListener('DOMContentLoaded', () => {
             
             const nameEl = document.createElement('div'); 
             nameEl.className = 'item-name'; 
-            nameEl.innerText = layer.name + (layer.isVideo ? " 🎥" : ""); 
+            nameEl.innerText = layer.name + (layer.ytId ? " 🔴" : (layer.isVideo ? " 🎥" : "")); 
             nameEl.onclick = () => { 
                 activeLayerId = layer.id; 
                 if(currentMode === 'camera') updateToolUI('layer');
@@ -597,7 +661,6 @@ window.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- TRASFORMAZIONI E STRUMENTI ---
     function applyWorldTransform(x, y, s) {
         const scene = scenes.find(sc => sc.id === currentSceneId);
         if(scene) { scene.panX = x; scene.panY = y; scene.scale = s; }
@@ -673,7 +736,6 @@ window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('clear-fog').onclick = () => { const scene = scenes.find(s => s.id === currentSceneId); const layer = scene?.layers.find(l => l.id === activeLayerId); if(layer) layer.ctx.clearRect(0, 0, layer.canvas.width, layer.canvas.height); else alert("Seleziona un livello!"); };
     document.getElementById('fill-fog').onclick = () => { const scene = scenes.find(s => s.id === currentSceneId); const layer = scene?.layers.find(l => l.id === activeLayerId); if(layer) { layer.ctx.globalCompositeOperation = 'source-over'; layer.ctx.fillStyle = 'black'; layer.ctx.fillRect(0, 0, layer.canvas.width, layer.canvas.height); } else alert("Seleziona un livello!"); };
 
-    // --- INTERAZIONE MATH & TOUCH ---
     function getPointerPos(e) { return (e.touches && e.touches.length > 0) ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : { x: e.clientX, y: e.clientY }; }
     function getDist(touches) { return Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY); }
     function getMid(touches) { return { x: (touches[0].clientX + touches[1].clientX) / 2, y: (touches[0].clientY + touches[1].clientY) / 2 }; }
@@ -710,9 +772,7 @@ window.addEventListener('DOMContentLoaded', () => {
         const currentTime = new Date().getTime();
         const tapLength = currentTime - lastTapTime;
         if (tapLength < 300 && tapLength > 0 && (!e.touches || e.touches.length === 1)) {
-            toggleCinemaMode();
-            e.preventDefault();
-            return;
+            toggleCinemaMode(); e.preventDefault(); return;
         }
         lastTapTime = currentTime;
 
@@ -801,7 +861,6 @@ window.addEventListener('DOMContentLoaded', () => {
         toggleCinemaMode();
     });
 
-    // --- FULLSCREEN E UI ---
     document.getElementById('btn-fullscreen').onclick = () => {
         if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(err => console.log(err));
         else if (document.exitFullscreen) document.exitFullscreen();
@@ -823,11 +882,10 @@ window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('toggle-square').onclick = () => calibSquare.style.display = (calibSquare.style.display === 'none' || calibSquare.style.display === '') ? 'block' : 'none';
     document.getElementById('square-size').oninput = (e) => { calibSquare.style.width = e.target.value + 'px'; calibSquare.style.height = e.target.value + 'px'; };
 
-    // Avvio Protetto per Vercel
     document.getElementById('btn-new-scene').onclick = createNewScene;
     createNewScene();
 
-}); // Fine DOMContentLoaded
+});
 </script>
 </body>
 </html>
