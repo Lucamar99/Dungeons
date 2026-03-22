@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>D&D Tavolo Proiettore - Local YT Patch</title>
+    <title>D&D Tavolo Proiettore - V19 Audio Update</title>
     <style>
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #050505; font-family: sans-serif; touch-action: none; color: #eee; }
         
@@ -95,6 +95,11 @@
             <input type="range" id="layer-rotation" min="0" max="360" value="0" style="margin-bottom: 0;">
             <button id="btn-reset-rot" style="flex: 0 0 auto; width: 40px; margin-left: 5px; padding: 4px;">0°</button>
         </div>
+
+        <label>Volume Audio (<span id="vol-display" style="color:#5cb85c;">0</span>%):</label>
+        <div class="row" style="align-items: center; margin-bottom: 8px;">
+            <input type="range" id="layer-volume" min="0" max="100" value="0" style="margin-bottom: 0;" disabled>
+        </div>
         
         <button id="btn-lock-camera" style="margin-bottom: 8px; background: #333;">🔓 Camera Sbloccata</button>
         
@@ -134,14 +139,17 @@
 <script>
 window.addEventListener('DOMContentLoaded', () => {
 
+    // --- STATO ARCHITETTURA ---
     let scenes = [];
     let currentSceneId = null;
     let activeLayerId = null; 
     let sceneCounter = 0;
     let layerCounter = 0;
     const MAX_FOG_RES = 1500;
+
     let layerToRelink = null;
 
+    // --- DOM ---
     const viewport = document.getElementById('viewport');
     const worldContainer = document.getElementById('world-container');
     const sceneListEl = document.getElementById('scene-list');
@@ -150,7 +158,10 @@ window.addEventListener('DOMContentLoaded', () => {
     const loadingOverlay = document.getElementById('loading-overlay');
     const btnLockCamera = document.getElementById('btn-lock-camera');
     const rotDisplay = document.getElementById('rot-display');
+    const volDisplay = document.getElementById('vol-display');
+    const volSlider = document.getElementById('layer-volume');
 
+    // --- INTERAZIONE ---
     let currentMode = 'camera'; 
     let isInteracting = false;
     let startX = 0, startY = 0;
@@ -182,6 +193,31 @@ window.addEventListener('DOMContentLoaded', () => {
         return (match && match[2].length === 11) ? match[2] : null;
     }
 
+    // --- MOTORE AUDIO ---
+    function applyLayerVolume(layer) {
+        if (!layer || (!layer.isVideo && !layer.ytId)) return;
+        const vol = layer.volume || 0;
+        
+        if (layer.isVideo && layer.mediaEl) {
+            layer.mediaEl.volume = vol / 100;
+            // Se vol > 0, togliamo il muto, altrimenti lo rimettiamo per risparmiare risorse
+            if (vol > 0) {
+                layer.mediaEl.muted = false;
+            } else {
+                layer.mediaEl.muted = true;
+            }
+        } else if (layer.ytId && layer.mediaEl && layer.mediaEl.contentWindow) {
+            // API Nascosta IFrame YouTube tramite postMessage
+            if (vol > 0) {
+                layer.mediaEl.contentWindow.postMessage(JSON.stringify({ "event": "command", "func": "unMute", "args": [] }), "*");
+                layer.mediaEl.contentWindow.postMessage(JSON.stringify({ "event": "command", "func": "setVolume", "args": [vol] }), "*");
+            } else {
+                layer.mediaEl.contentWindow.postMessage(JSON.stringify({ "event": "command", "func": "mute", "args": [] }), "*");
+            }
+        }
+    }
+
+    // --- SCENE E LAYER ---
     function createNewScene() {
         sceneCounter++;
         const newScene = { id: sceneCounter, name: `Scena ${sceneCounter}`, layers: [], panX: 0, panY: 0, scale: 1, cameraLocked: false };
@@ -196,7 +232,12 @@ window.addEventListener('DOMContentLoaded', () => {
         sceneControls.classList.remove('hidden');
         renderSceneList();
         worldContainer.innerHTML = '';
-        scene.layers.forEach(layer => { worldContainer.appendChild(layer.wrapper); updateLayerTransform(layer); });
+        scene.layers.forEach(layer => { 
+            worldContainer.appendChild(layer.wrapper); 
+            updateLayerTransform(layer); 
+            // Riapplica i volumi in caso di cambio scena
+            applyLayerVolume(layer);
+        });
         applyWorldTransform(scene.panX, scene.panY, scene.scale);
         updateCameraLockUI(scene);
         renderLayers();
@@ -211,6 +252,9 @@ window.addEventListener('DOMContentLoaded', () => {
     function deleteScene(id) {
         const scene = scenes.find(s => s.id === id);
         if (confirm(`Sei sicuro di voler eliminare definitivamente la scena "${scene.name}"? L'operazione non può essere annullata.`)) {
+            // Blocca eventuali video in riproduzione prima di cancellarli
+            scene.layers.forEach(l => { if(l.mediaEl) l.mediaEl.src = ""; });
+
             scenes = scenes.filter(s => s.id !== id);
             if (scenes.length === 0) createNewScene();
             else if (currentSceneId === id) switchScene(scenes[0].id);
@@ -241,15 +285,12 @@ window.addEventListener('DOMContentLoaded', () => {
             
             if (ytId) {
                 mediaEl = document.createElement('iframe');
-                
-                // MENTIAMO AL SISTEMA SULL'ORIGINE SE SIAMO IN LOCALE
                 let currentOrigin = window.location.origin;
                 if (!currentOrigin || currentOrigin === "null" || currentOrigin === "file://") {
-                    currentOrigin = "https://www.youtube.com"; // Fallback sicuro
+                    currentOrigin = "https://www.youtube.com"; 
                 }
-
-                // Usiamo youtube.com standard e passiamo l'origin corretto
-                mediaEl.src = `https://www.youtube.com/embed/${ytId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${ytId}&playsinline=1&modestbranding=1&origin=${currentOrigin}`;
+                // Aggiunto "enablejsapi=1" per permettere il controllo del volume!
+                mediaEl.src = `https://www.youtube.com/embed/${ytId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${ytId}&playsinline=1&modestbranding=1&origin=${currentOrigin}&enablejsapi=1`;
                 mediaEl.allow = "autoplay; encrypted-media";
                 mediaEl.setAttribute("referrerpolicy", "strict-origin-when-cross-origin");
                 mediaEl.style.backgroundColor = "#000";
@@ -258,7 +299,7 @@ window.addEventListener('DOMContentLoaded', () => {
                 mediaEl = document.createElement('video');
                 mediaEl.autoplay = true;
                 mediaEl.loop = true;
-                mediaEl.muted = true;
+                mediaEl.muted = true; // Obbligatorio per i browser per l'autoplay
                 mediaEl.playsInline = true;
                 mediaEl.style.backgroundColor = "#222"; 
                 if (mediaSrc) {
@@ -339,7 +380,7 @@ window.addEventListener('DOMContentLoaded', () => {
             ytId: ytId, 
             nWidth: nWidth, nHeight: nHeight,
             wrapper: domElements.wrapper, canvas: domElements.canvas, ctx: domElements.ctx, mediaEl: domElements.mediaEl,
-            fogRatio: fogRatio, x: 0, y: 0, scale: 1, rotation: 0, visible: true, lockMove: false, lockScale: false,
+            fogRatio: fogRatio, x: 0, y: 0, scale: 1, rotation: 0, volume: 0, visible: true, lockMove: false, lockScale: false,
             isVideo: false, needsRelink: false
         };
         
@@ -369,7 +410,7 @@ window.addEventListener('DOMContentLoaded', () => {
                 ytId: null,
                 nWidth: nWidth, nHeight: nHeight,
                 wrapper: domElements.wrapper, canvas: domElements.canvas, ctx: domElements.ctx, mediaEl: domElements.mediaEl,
-                fogRatio: fogRatio, x: 0, y: 0, scale: 1, rotation: 0, visible: true, lockMove: false, lockScale: false,
+                fogRatio: fogRatio, x: 0, y: 0, scale: 1, rotation: 0, volume: 0, visible: true, lockMove: false, lockScale: false,
                 isVideo: isVideo, needsRelink: false
             };
             
@@ -427,6 +468,7 @@ window.addEventListener('DOMContentLoaded', () => {
         if (newName) { layer.name = newName; renderLayers(); }
     }
 
+    // --- GESTIONE SLIDER ROTAZIONE E VOLUME ---
     document.getElementById('layer-rotation').addEventListener('input', (e) => {
         const scene = scenes.find(s => s.id === currentSceneId);
         const layer = scene?.layers.find(l => l.id === activeLayerId);
@@ -448,6 +490,17 @@ window.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+    volSlider.addEventListener('input', (e) => {
+        const scene = scenes.find(s => s.id === currentSceneId);
+        const layer = scene?.layers.find(l => l.id === activeLayerId);
+        if(layer && (layer.isVideo || layer.ytId)) {
+            layer.volume = parseInt(e.target.value);
+            volDisplay.innerText = layer.volume;
+            applyLayerVolume(layer);
+        }
+    });
+
+    // --- LOGICA RELINK VIDEO ---
     document.getElementById('upload-relink').addEventListener('change', (e) => {
         const file = e.target.files[0];
         if (!file || !layerToRelink) return;
@@ -456,11 +509,16 @@ window.addEventListener('DOMContentLoaded', () => {
         layerToRelink.mediaEl.src = objectUrl;
         layerToRelink.mediaEl.load();
         layerToRelink.needsRelink = false; 
+        
+        // Riapplica il volume salvato una volta ricaricato
+        setTimeout(() => applyLayerVolume(layerToRelink), 500);
+
         layerToRelink = null;
         renderLayers();
         e.target.value = '';
     });
 
+    // --- SALVATAGGIO E CARICAMENTO ---
     document.getElementById('btn-save-project').onclick = () => {
         for (let s of scenes) {
             for (let l of s.layers) {
@@ -475,7 +533,7 @@ window.addEventListener('DOMContentLoaded', () => {
         if (!customFileName) return; 
 
         loadingOverlay.style.display = 'flex';
-        document.getElementById('loading-text').innerText = "Salvataggio in corso...";
+        document.getElementById('loading-text').innerText = "Salvataggio super-veloce in corso...";
         
         setTimeout(() => {
             try {
@@ -489,7 +547,7 @@ window.addEventListener('DOMContentLoaded', () => {
                             imgSrc: layer.imgSrc, ytId: layer.ytId || null, 
                             nWidth: layer.nWidth, nHeight: layer.nHeight, fogRatio: layer.fogRatio,
                             fogData: layer.canvas.toDataURL(), 
-                            x: layer.x, y: layer.y, scale: layer.scale, rotation: layer.rotation || 0,
+                            x: layer.x, y: layer.y, scale: layer.scale, rotation: layer.rotation || 0, volume: layer.volume || 0,
                             visible: layer.visible, lockMove: layer.lockMove, lockScale: layer.lockScale,
                             isVideo: layer.isVideo || false
                         }))
@@ -519,7 +577,7 @@ window.addEventListener('DOMContentLoaded', () => {
         if (!file) return;
         
         loadingOverlay.style.display = 'flex';
-        document.getElementById('loading-text').innerText = "Caricamento mappa e nebbia...";
+        document.getElementById('loading-text').innerText = "Caricamento istantaneo mappa e nebbia...";
         
         const reader = new FileReader();
         reader.onload = async (event) => {
@@ -558,14 +616,19 @@ window.addEventListener('DOMContentLoaded', () => {
                         let moveLocked = layerData.lockMove !== undefined ? layerData.lockMove : (layerData.locked || false);
                         let scaleLocked = layerData.lockScale !== undefined ? layerData.lockScale : (layerData.locked || false);
 
-                        newScene.layers.push({
+                        const createdLayer = {
                             id: layerData.id, name: layerData.name, fileName: layerData.fileName,
                             imgSrc: layerData.imgSrc, ytId: ytId, nWidth: layerData.nWidth, nHeight: layerData.nHeight, fogRatio: layerData.fogRatio,
                             wrapper: domElements.wrapper, canvas: domElements.canvas, ctx: domElements.ctx, mediaEl: domElements.mediaEl,
-                            x: layerData.x, y: layerData.y, scale: layerData.scale, rotation: layerData.rotation || 0,
+                            x: layerData.x, y: layerData.y, scale: layerData.scale, rotation: layerData.rotation || 0, volume: layerData.volume || 0,
                             visible: layerData.visible, lockMove: moveLocked, lockScale: scaleLocked,
                             isVideo: isVid, needsRelink: needsRelink
-                        });
+                        };
+
+                        newScene.layers.push(createdLayer);
+
+                        // Applica il volume dopo un breve delay per dare tempo all'IFrame/Video di avviarsi
+                        setTimeout(() => applyLayerVolume(createdLayer), 1500);
                     }
                     scenes.push(newScene);
                 }
@@ -582,6 +645,7 @@ window.addEventListener('DOMContentLoaded', () => {
         reader.readAsText(file);
     });
 
+    // --- RENDER UI ---
     function renderSceneList() {
         sceneListEl.innerHTML = '';
         scenes.forEach(scene => {
@@ -598,20 +662,33 @@ window.addEventListener('DOMContentLoaded', () => {
     function renderLayers() {
         const scene = scenes.find(s => s.id === currentSceneId);
         layerListEl.innerHTML = '';
-        const rotSlider = document.getElementById('layer-rotation');
         
         if (!scene) {
-            rotSlider.value = 0; rotDisplay.innerText = "0"; return;
+            rotDisplay.innerText = "0"; document.getElementById('layer-rotation').value = 0;
+            volDisplay.innerText = "0"; volSlider.value = 0; volSlider.disabled = true;
+            return;
         }
 
         if (activeLayerId) {
             const activeL = scene.layers.find(l => l.id === activeLayerId);
             if (activeL) {
-                rotSlider.value = activeL.rotation || 0;
+                document.getElementById('layer-rotation').value = activeL.rotation || 0;
                 rotDisplay.innerText = activeL.rotation || 0;
+
+                // Controlla se il layer è un video o youtube per abilitare il volume
+                if(activeL.isVideo || activeL.ytId) {
+                    volSlider.disabled = false;
+                    volSlider.value = activeL.volume || 0;
+                    volDisplay.innerText = activeL.volume || 0;
+                } else {
+                    volSlider.disabled = true;
+                    volSlider.value = 0;
+                    volDisplay.innerText = "0";
+                }
             }
         } else {
-            rotSlider.value = 0; rotDisplay.innerText = "0";
+            document.getElementById('layer-rotation').value = 0; rotDisplay.innerText = "0";
+            volSlider.value = 0; volDisplay.innerText = "0"; volSlider.disabled = true;
         }
 
         [...scene.layers].reverse().forEach(layer => {
@@ -661,6 +738,7 @@ window.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // --- TRASFORMAZIONI E STRUMENTI ---
     function applyWorldTransform(x, y, s) {
         const scene = scenes.find(sc => sc.id === currentSceneId);
         if(scene) { scene.panX = x; scene.panY = y; scene.scale = s; }
@@ -885,7 +963,7 @@ window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-new-scene').onclick = createNewScene;
     createNewScene();
 
-});
+}); 
 </script>
 </body>
 </html>
