@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>D&D Tavolo Proiettore - V24 YT Ultimate Hack</title>
+    <title>D&D Tavolo Proiettore - V25 Clean YT</title>
     
     <script src="https://www.youtube.com/iframe_api"></script>
 
@@ -11,16 +11,10 @@
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #050505; font-family: sans-serif; touch-action: none; color: #eee; }
         
         #viewport { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
-        
-        /* Aggiunto overflow: hidden per il trucco della ghigliottina */
         #world-container { position: absolute; top: 0; left: 0; transform-origin: 0 0; will-change: transform; width: 0; height: 0; }
-        .layer-wrapper { position: absolute; top: 0; left: 0; transform-origin: center; will-change: transform; overflow: hidden; }
         
+        .layer-wrapper { position: absolute; top: 0; left: 0; transform-origin: center; will-change: transform; }
         .layer-img { width: 100%; height: 100%; object-fit: fill; display: block; pointer-events: none; border: none; }
-        
-        /* TRUCCO GHIGLIOTTINA: Zooma il video di YT dell'8% per spingere i loghi fuori dal box visibile */
-        .yt-iframe { transform: scale(1.08); width: 100%; height: 100%; }
-
         .fog-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
         
         #calibration-square { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); border: 4px solid #ff3333; background: rgba(255, 51, 51, 0.3); z-index: 100; pointer-events: none; width: 50px; height: 50px; display: none; }
@@ -219,49 +213,23 @@ window.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- NUOVO MOTORE YT LOOP ANTI-BLOCCO ---
+    // PULIZIA MOTORE YT: Nessun forced buffering
     function initYTLoop(layer) {
         if (!layer.ytId) return;
         
         if (!layer.mediaEl.id) {
             layer.mediaEl.id = 'yt-' + Math.random().toString(36).substr(2, 9);
         }
-        
-        layer.loopActive = false; 
 
         if (window.YT && window.YT.Player) {
             layer.ytPlayer = new YT.Player(layer.mediaEl.id, {
                 events: {
                     'onReady': (e) => {
                         applyLayerVolume(layer);
-                        layer.loopActive = true;
-                        
-                        const checkYTLoop = () => {
-                            try {
-                                if (layer.ytPlayer && layer.ytPlayer.getCurrentTime && layer.loopActive) {
-                                    const time = layer.ytPlayer.getCurrentTime();
-                                    const dur = layer.ytPlayer.getDuration();
-                                    
-                                    if (dur > 0 && time >= dur - 0.4) {
-                                        layer.ytPlayer.seekTo(0.1, true);
-                                        layer.ytPlayer.playVideo(); // Forza il play
-                                    }
-                                }
-                            } catch(err) {}
-                            
-                            if (layer.loopActive) {
-                                requestAnimationFrame(checkYTLoop); 
-                            }
-                        };
-                        requestAnimationFrame(checkYTLoop);
                     },
-                    // Watchdog: Se il video prova a fermarsi o finisce, lo forziamo a ripartire
                     'onStateChange': (e) => {
+                        // Forziamo solo il play se si ferma del tutto alla fine nativa
                         if (e.data === YT.PlayerState.ENDED) {
-                            layer.ytPlayer.seekTo(0.1, true);
-                            layer.ytPlayer.playVideo();
-                        }
-                        if (e.data === YT.PlayerState.PAUSED) {
                             layer.ytPlayer.playVideo();
                         }
                     }
@@ -309,11 +277,6 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     function switchScene(id) {
-        if (currentSceneId) {
-            const oldScene = scenes.find(s => s.id === currentSceneId);
-            if (oldScene) oldScene.layers.forEach(l => l.loopActive = false);
-        }
-
         currentSceneId = id; activeLayerId = null; updateToolUI('camera');
         const scene = scenes.find(s => s.id === id);
         sceneControls.classList.remove('hidden');
@@ -342,7 +305,6 @@ window.addEventListener('DOMContentLoaded', () => {
         if (confirm(`Sei sicuro di voler eliminare definitivamente la scena "${scene.name}"? L'operazione non può essere annullata.`)) {
             scene.layers.forEach(l => { 
                 if(l.mediaEl) l.mediaEl.src = ""; 
-                l.loopActive = false; 
             });
             scenes = scenes.filter(s => s.id !== id);
             if (scenes.length === 0) createNewScene();
@@ -378,13 +340,12 @@ window.addEventListener('DOMContentLoaded', () => {
                 if (!currentOrigin || currentOrigin === "null" || currentOrigin === "file://") {
                     currentOrigin = "https://www.youtube.com"; 
                 }
-                // Aggiunto iv_load_policy=3 (rimuove annotazioni) e rel=0
-                mediaEl.src = `https://www.youtube.com/embed/${ytId}?autoplay=1&mute=1&controls=0&playlist=${ytId}&playsinline=1&modestbranding=1&rel=0&iv_load_policy=3&disablekb=1&origin=${currentOrigin}&enablejsapi=1`;
+                // Rimosso lo zoom, affidamento totale sul loop nativo di YouTube
+                mediaEl.src = `https://www.youtube.com/embed/${ytId}?autoplay=1&mute=1&controls=0&playlist=${ytId}&loop=1&playsinline=1&modestbranding=1&rel=0&iv_load_policy=3&disablekb=1&origin=${currentOrigin}&enablejsapi=1`;
                 mediaEl.allow = "autoplay; encrypted-media";
                 mediaEl.setAttribute("referrerpolicy", "strict-origin-when-cross-origin");
                 mediaEl.style.backgroundColor = "#000";
-                // Aggiungiamo la classe yt-iframe per la "ghigliottina"
-                mediaEl.className = 'layer-img yt-iframe'; 
+                mediaEl.className = 'layer-img'; // Tornata la classe standard senza modificatori strani
                 setTimeout(finalizeDOM, 50); 
             } else if (isVideo) {
                 mediaEl = document.createElement('video');
@@ -740,7 +701,8 @@ window.addEventListener('DOMContentLoaded', () => {
                 if (scenes.length > 0) switchScene(scenes[0].id);
 
             } catch (error) {
-                alert("Impossibile caricare il file.");
+                alert("Impossibile caricare il file. Assicurati che sia un file di Campagna valido.");
+                console.error(error);
             }
             loadingOverlay.style.display = 'none';
             e.target.value = '';
