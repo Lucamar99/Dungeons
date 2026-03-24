@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>D&D Tavolo Proiettore - V21 Hyper Loop</title>
+    <title>D&D Tavolo Proiettore - V2.5 Layer Order</title>
     <style>
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #050505; font-family: sans-serif; touch-action: none; color: #eee; }
         
@@ -16,7 +16,7 @@
         
         #calibration-square { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); border: 4px solid #ff3333; background: rgba(255, 51, 51, 0.3); z-index: 100; pointer-events: none; width: 50px; height: 50px; display: none; }
         
-        #ui-panel { position: absolute; top: 10px; left: 10px; z-index: 60; background: rgba(20,20,20,0.95); padding: 12px; border-radius: 8px; border: 1px solid #444; width: 330px; max-height: 90vh; overflow-y: auto; box-shadow: 0 5px 15px rgba(0,0,0,0.9); transition: opacity 0.2s; }
+        #ui-panel { position: absolute; top: 10px; left: 10px; z-index: 60; background: rgba(20,20,20,0.95); padding: 12px; border-radius: 8px; border: 1px solid #444; width: 340px; max-height: 90vh; overflow-y: auto; box-shadow: 0 5px 15px rgba(0,0,0,0.9); transition: opacity 0.2s; }
         
         h3 { margin: 0 0 8px 0; font-size: 13px; color: #fff; text-transform: uppercase; border-bottom: 1px solid #555; padding-bottom: 4px; }
         label { font-size: 11px; font-weight: bold; color: #aaa; display: block; margin: 8px 0 3px 0; text-transform: uppercase; }
@@ -34,8 +34,8 @@
         .item-row { display: flex; align-items: center; flex-wrap: wrap; background: #222; padding: 4px; border-radius: 4px; border: 1px solid #333; gap: 2px;}
         .item-row.active { border-color: #5cb85c; background: #1a2a1a; }
         
-        .item-name { flex: 1; min-width: 100px; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; padding: 4px; }
-        .btn-icon { width: 26px; height: 26px; padding: 0; background: #333; font-size: 12px; display: flex; align-items: center; justify-content: center; margin-left: 2px; flex-shrink: 0;}
+        .item-name { flex: 1; min-width: 80px; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; padding: 4px; }
+        .btn-icon { width: 24px; height: 24px; padding: 0; background: #333; font-size: 11px; display: flex; align-items: center; justify-content: center; margin-left: 2px; flex-shrink: 0;}
         .btn-icon:hover { background: #555; }
         .btn-icon.on { background: #f0ad4e; color: black; }
         .btn-icon.danger { background: #d9534f; color: white; }
@@ -210,6 +210,36 @@ window.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // --- NUOVA LOGICA: ORDINAMENTO LIVELLI (Z-INDEX) ---
+    function updateZIndices() {
+        const scene = scenes.find(s => s.id === currentSceneId);
+        if (!scene) return;
+        // Assegna uno z-index basato sulla posizione nell'array
+        scene.layers.forEach((layer, index) => {
+            layer.wrapper.style.zIndex = index + 10;
+        });
+    }
+
+    function moveLayer(layerId, direction) {
+        const scene = scenes.find(s => s.id === currentSceneId);
+        if (!scene) return;
+        const index = scene.layers.findIndex(l => l.id === layerId);
+        if (index === -1) return;
+
+        if (direction === 'up' && index < scene.layers.length - 1) {
+            const temp = scene.layers[index];
+            scene.layers[index] = scene.layers[index + 1];
+            scene.layers[index + 1] = temp;
+        } else if (direction === 'down' && index > 0) {
+            const temp = scene.layers[index];
+            scene.layers[index] = scene.layers[index - 1];
+            scene.layers[index - 1] = temp;
+        }
+        
+        updateZIndices();
+        renderLayers();
+    }
+
     function createNewScene() {
         sceneCounter++;
         const newScene = { id: sceneCounter, name: `Scena ${sceneCounter}`, layers: [], panX: 0, panY: 0, scale: 1, cameraLocked: false };
@@ -231,6 +261,7 @@ window.addEventListener('DOMContentLoaded', () => {
         });
         applyWorldTransform(scene.panX, scene.panY, scene.scale);
         updateCameraLockUI(scene);
+        updateZIndices();
         renderLayers();
     }
 
@@ -286,17 +317,15 @@ window.addEventListener('DOMContentLoaded', () => {
             } else if (isVideo) {
                 mediaEl = document.createElement('video');
                 mediaEl.autoplay = true;
-                mediaEl.loop = true; // Fallback nativo
+                mediaEl.loop = true;
                 mediaEl.muted = true; 
                 mediaEl.playsInline = true;
                 mediaEl.style.backgroundColor = "#222"; 
                 
-                // MOTORE HYPER-LOOP A 60 FPS
                 const seamlessLoop = () => {
                     if (mediaEl && mediaEl.duration) {
-                        // Se mancano meno di 0.2 secondi alla fine, forziamo il riavvio manuale
                         if (mediaEl.currentTime >= mediaEl.duration - 0.2) {
-                            mediaEl.currentTime = 0.01; // Saltiamo il frame zero per evitare lag di decodifica
+                            mediaEl.currentTime = 0.01; 
                             mediaEl.play().catch(e => console.log(e));
                         }
                     }
@@ -458,14 +487,15 @@ window.addEventListener('DOMContentLoaded', () => {
         
         worldContainer.appendChild(newLayer.wrapper);
         updateLayerTransform(newLayer);
+        updateZIndices();
         renderLayers();
     }
 
     function updateLayerTransform(layer) {
         const rot = layer.rotation || 0;
+        // Rimosso l'assegnazione dello z-index da qui, ora è gestito globalmente da updateZIndices
         layer.wrapper.style.transform = `translate(${layer.x}px, ${layer.y}px) scale(${layer.scale}) rotate(${rot}deg)`;
         layer.wrapper.style.display = layer.visible ? 'block' : 'none';
-        layer.wrapper.style.zIndex = layer.id;
     }
 
     function renameLayer(id) {
@@ -629,7 +659,6 @@ window.addEventListener('DOMContentLoaded', () => {
                         };
 
                         newScene.layers.push(createdLayer);
-
                         setTimeout(() => applyLayerVolume(createdLayer), 1500);
                     }
                     scenes.push(newScene);
@@ -703,25 +732,44 @@ window.addEventListener('DOMContentLoaded', () => {
                 else renderLayers(); 
             };
             
+            // Pulsanti Ordine Livelli
+            const btnUp = document.createElement('button'); 
+            btnUp.className = 'btn-icon'; btnUp.innerText = '🔼'; btnUp.title = "Sposta Sopra";
+            btnUp.onclick = (e) => { e.stopPropagation(); moveLayer(layer.id, 'up'); };
+
+            const btnDown = document.createElement('button'); 
+            btnDown.className = 'btn-icon'; btnDown.innerText = '🔽'; btnDown.title = "Sposta Sotto";
+            btnDown.onclick = (e) => { e.stopPropagation(); moveLayer(layer.id, 'down'); };
+
             const btnVis = document.createElement('button'); 
             btnVis.className = `btn-icon ${layer.visible ? '' : 'danger'}`; 
             btnVis.innerText = layer.visible ? '👁️' : '❌'; 
-            btnVis.title = "Visibilità"; btnVis.onclick = () => { layer.visible = !layer.visible; updateLayerTransform(layer); renderLayers(); };
+            btnVis.title = "Visibilità"; btnVis.onclick = (e) => { e.stopPropagation(); layer.visible = !layer.visible; updateLayerTransform(layer); renderLayers(); };
             
             const btnLockMove = document.createElement('button'); 
             btnLockMove.className = `btn-icon ${layer.lockMove ? 'danger' : ''}`; 
             btnLockMove.innerText = layer.lockMove ? '📍' : '✋'; 
-            btnLockMove.title = "Blocca Movimento"; btnLockMove.onclick = () => { layer.lockMove = !layer.lockMove; renderLayers(); };
+            btnLockMove.title = "Blocca Movimento"; btnLockMove.onclick = (e) => { e.stopPropagation(); layer.lockMove = !layer.lockMove; renderLayers(); };
 
             const btnLockScale = document.createElement('button'); 
             btnLockScale.className = `btn-icon ${layer.lockScale ? 'danger' : ''}`; 
             btnLockScale.innerText = layer.lockScale ? '🔒' : '🔎'; 
-            btnLockScale.title = "Blocca Zoom"; btnLockScale.onclick = () => { layer.lockScale = !layer.lockScale; renderLayers(); };
+            btnLockScale.title = "Blocca Zoom"; btnLockScale.onclick = (e) => { e.stopPropagation(); layer.lockScale = !layer.lockScale; renderLayers(); };
             
-            const btnRename = document.createElement('button'); btnRename.className = 'btn-icon'; btnRename.innerText = '✏️'; btnRename.onclick = () => renameLayer(layer.id);
-            const btnDel = document.createElement('button'); btnDel.className = 'btn-icon'; btnDel.innerText = '🗑️'; btnDel.onclick = () => { scene.layers = scene.layers.filter(l => l.id !== layer.id); if (activeLayerId === layer.id) activeLayerId = null; layer.wrapper.remove(); renderLayers(); };
+            const btnRename = document.createElement('button'); btnRename.className = 'btn-icon'; btnRename.innerText = '✏️'; 
+            btnRename.onclick = (e) => { e.stopPropagation(); renameLayer(layer.id); };
 
-            row.appendChild(nameEl); row.appendChild(btnVis); row.appendChild(btnLockMove); row.appendChild(btnLockScale); row.appendChild(btnRename); row.appendChild(btnDel);
+            const btnDel = document.createElement('button'); btnDel.className = 'btn-icon'; btnDel.innerText = '🗑️'; 
+            btnDel.onclick = (e) => { e.stopPropagation(); scene.layers = scene.layers.filter(l => l.id !== layer.id); if (activeLayerId === layer.id) activeLayerId = null; layer.wrapper.remove(); updateZIndices(); renderLayers(); };
+
+            row.appendChild(nameEl); 
+            row.appendChild(btnUp);
+            row.appendChild(btnDown);
+            row.appendChild(btnVis); 
+            row.appendChild(btnLockMove); 
+            row.appendChild(btnLockScale); 
+            row.appendChild(btnRename); 
+            row.appendChild(btnDel);
             
             if (layer.needsRelink) {
                 const btnRelink = document.createElement('button');
