@@ -3,7 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>D&D Tavolo Proiettore - V2.5 Layer Order</title>
+    <title>D&D Tavolo Proiettore - V2.6 YT API Seamless</title>
+    
+    <script src="https://www.youtube.com/iframe_api"></script>
+
     <style>
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #050505; font-family: sans-serif; touch-action: none; color: #eee; }
         
@@ -210,11 +213,53 @@ window.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- NUOVA LOGICA: ORDINAMENTO LIVELLI (Z-INDEX) ---
+    // --- YT API LOGIC (REWINDS THE VIDEO TO PREVENT BUFFERING) ---
+    function initYTLoop(layer) {
+        if (!layer.ytId) return;
+        
+        if (!layer.mediaEl.id) {
+            layer.mediaEl.id = 'yt-' + Math.random().toString(36).substr(2, 9);
+        }
+        
+        layer.loopActive = false; // Reset 
+
+        if (window.YT && window.YT.Player) {
+            layer.ytPlayer = new YT.Player(layer.mediaEl.id, {
+                events: {
+                    'onReady': (e) => {
+                        applyLayerVolume(layer);
+                        layer.loopActive = true;
+                        
+                        const checkYTLoop = () => {
+                            try {
+                                if (layer.ytPlayer && layer.ytPlayer.getCurrentTime && layer.loopActive) {
+                                    const time = layer.ytPlayer.getCurrentTime();
+                                    const dur = layer.ytPlayer.getDuration();
+                                    
+                                    // LA MAGIA AVVIENE QUI: A 0.4 sec dalla fine, lo forziamo a 0.1
+                                    if (dur > 0 && time >= dur - 0.4) {
+                                        layer.ytPlayer.seekTo(0.1, true);
+                                    }
+                                }
+                            } catch(err) {}
+                            
+                            if (layer.loopActive) {
+                                requestAnimationFrame(checkYTLoop); 
+                            }
+                        };
+                        requestAnimationFrame(checkYTLoop);
+                    }
+                }
+            });
+        } else {
+            // Se l'API non ha finito di caricare, aspetta mezzo secondo
+            setTimeout(() => initYTLoop(layer), 500);
+        }
+    }
+
     function updateZIndices() {
         const scene = scenes.find(s => s.id === currentSceneId);
         if (!scene) return;
-        // Assegna uno z-index basato sulla posizione nell'array
         scene.layers.forEach((layer, index) => {
             layer.wrapper.style.zIndex = index + 10;
         });
@@ -249,6 +294,12 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     function switchScene(id) {
+        // Disattiva il loop della scena precedente
+        if (currentSceneId) {
+            const oldScene = scenes.find(s => s.id === currentSceneId);
+            if (oldScene) oldScene.layers.forEach(l => l.loopActive = false);
+        }
+
         currentSceneId = id; activeLayerId = null; updateToolUI('camera');
         const scene = scenes.find(s => s.id === id);
         sceneControls.classList.remove('hidden');
@@ -258,6 +309,7 @@ window.addEventListener('DOMContentLoaded', () => {
             worldContainer.appendChild(layer.wrapper); 
             updateLayerTransform(layer); 
             applyLayerVolume(layer);
+            initYTLoop(layer); // Attiva YT Loop per questa scena
         });
         applyWorldTransform(scene.panX, scene.panY, scene.scale);
         updateCameraLockUI(scene);
@@ -274,7 +326,10 @@ window.addEventListener('DOMContentLoaded', () => {
     function deleteScene(id) {
         const scene = scenes.find(s => s.id === id);
         if (confirm(`Sei sicuro di voler eliminare definitivamente la scena "${scene.name}"? L'operazione non può essere annullata.`)) {
-            scene.layers.forEach(l => { if(l.mediaEl) l.mediaEl.src = ""; });
+            scene.layers.forEach(l => { 
+                if(l.mediaEl) l.mediaEl.src = ""; 
+                l.loopActive = false; 
+            });
             scenes = scenes.filter(s => s.id !== id);
             if (scenes.length === 0) createNewScene();
             else if (currentSceneId === id) switchScene(scenes[0].id);
@@ -309,7 +364,7 @@ window.addEventListener('DOMContentLoaded', () => {
                 if (!currentOrigin || currentOrigin === "null" || currentOrigin === "file://") {
                     currentOrigin = "https://www.youtube.com"; 
                 }
-                mediaEl.src = `https://www.youtube.com/embed/${ytId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${ytId}&playsinline=1&modestbranding=1&origin=${currentOrigin}&enablejsapi=1`;
+                mediaEl.src = `https://www.youtube.com/embed/${ytId}?autoplay=1&mute=1&controls=0&playlist=${ytId}&playsinline=1&modestbranding=1&origin=${currentOrigin}&enablejsapi=1`;
                 mediaEl.allow = "autoplay; encrypted-media";
                 mediaEl.setAttribute("referrerpolicy", "strict-origin-when-cross-origin");
                 mediaEl.style.backgroundColor = "#000";
@@ -489,11 +544,13 @@ window.addEventListener('DOMContentLoaded', () => {
         updateLayerTransform(newLayer);
         updateZIndices();
         renderLayers();
+
+        // Inizializza l'API di YouTube per il loop
+        initYTLoop(newLayer);
     }
 
     function updateLayerTransform(layer) {
         const rot = layer.rotation || 0;
-        // Rimosso l'assegnazione dello z-index da qui, ora è gestito globalmente da updateZIndices
         layer.wrapper.style.transform = `translate(${layer.x}px, ${layer.y}px) scale(${layer.scale}) rotate(${rot}deg)`;
         layer.wrapper.style.display = layer.visible ? 'block' : 'none';
     }
@@ -610,7 +667,7 @@ window.addEventListener('DOMContentLoaded', () => {
         if (!file) return;
         
         loadingOverlay.style.display = 'flex';
-        document.getElementById('loading-text').innerText = "Caricamento istantaneo mappa e nebbia...";
+        document.getElementById('loading-text').innerText = "Caricamento istantaneo...";
         
         const reader = new FileReader();
         reader.onload = async (event) => {
@@ -659,7 +716,6 @@ window.addEventListener('DOMContentLoaded', () => {
                         };
 
                         newScene.layers.push(createdLayer);
-                        setTimeout(() => applyLayerVolume(createdLayer), 1500);
                     }
                     scenes.push(newScene);
                 }
@@ -732,7 +788,6 @@ window.addEventListener('DOMContentLoaded', () => {
                 else renderLayers(); 
             };
             
-            // Pulsanti Ordine Livelli
             const btnUp = document.createElement('button'); 
             btnUp.className = 'btn-icon'; btnUp.innerText = '🔼'; btnUp.title = "Sposta Sopra";
             btnUp.onclick = (e) => { e.stopPropagation(); moveLayer(layer.id, 'up'); };
@@ -762,14 +817,7 @@ window.addEventListener('DOMContentLoaded', () => {
             const btnDel = document.createElement('button'); btnDel.className = 'btn-icon'; btnDel.innerText = '🗑️'; 
             btnDel.onclick = (e) => { e.stopPropagation(); scene.layers = scene.layers.filter(l => l.id !== layer.id); if (activeLayerId === layer.id) activeLayerId = null; layer.wrapper.remove(); updateZIndices(); renderLayers(); };
 
-            row.appendChild(nameEl); 
-            row.appendChild(btnUp);
-            row.appendChild(btnDown);
-            row.appendChild(btnVis); 
-            row.appendChild(btnLockMove); 
-            row.appendChild(btnLockScale); 
-            row.appendChild(btnRename); 
-            row.appendChild(btnDel);
+            row.appendChild(nameEl); row.appendChild(btnUp); row.appendChild(btnDown); row.appendChild(btnVis); row.appendChild(btnLockMove); row.appendChild(btnLockScale); row.appendChild(btnRename); row.appendChild(btnDel);
             
             if (layer.needsRelink) {
                 const btnRelink = document.createElement('button');
