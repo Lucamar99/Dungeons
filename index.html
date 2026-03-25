@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>D&D Tavolo Proiettore - V20 Clean Edition</title>
+    <title>D&D Tavolo Proiettore - V22 Livelli e Disegni</title>
     <style>
-        /* Regola globale per mantenere perfetti tutti i margini e i bottoni dell'interfaccia */
+        /* Regola globale per margini perfetti */
         *, *::before, *::after { box-sizing: border-box; }
         
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #050505; font-family: sans-serif; touch-action: none; color: #eee; }
@@ -17,8 +17,8 @@
         .layer-img { width: 100%; height: 100%; object-fit: fill; display: block; pointer-events: none; border: none; }
         .fog-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
         
-        /* Disegni e Ping (Con tela SVG estesa a 100.000px per evitare i bug dei browser tablet) */
-        #drawings-svg { position: absolute; top: -50000px; left: -50000px; width: 100000px; height: 100000px; overflow: visible; pointer-events: none; z-index: 9000; }
+        /* Disegni ora sono dentro ogni layer, questa è la loro classe */
+        .layer-drawings { position: absolute; top: -50000px; left: -50000px; width: 100000px; height: 100000px; overflow: visible; pointer-events: none; z-index: 500; }
         
         @keyframes ping-anim {
             0% { transform: scale(0); opacity: 1; border-width: 10px; }
@@ -65,8 +65,8 @@
         .list-container { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
         .item-row { display: flex; align-items: center; flex-wrap: wrap; background: #222; padding: 4px; border-radius: 4px; border: 1px solid #333; gap: 2px;}
         .item-row.active { border-color: #5cb85c; background: #1a2a1a; }
-        .item-name { flex: 1; min-width: 100px; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; padding: 4px; }
-        .btn-icon { width: 26px; height: 26px; padding: 0; background: #333; font-size: 12px; display: flex; align-items: center; justify-content: center; margin-left: 2px; flex-shrink: 0;}
+        .item-name { flex: 1; min-width: 60px; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; padding: 4px; }
+        .btn-icon { width: 22px; height: 22px; padding: 0; background: #333; font-size: 11px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;}
         .btn-icon:hover { background: #555; }
         .btn-icon.on { background: #f0ad4e; color: black; }
         .btn-icon.danger { background: #d9534f; color: white; }
@@ -131,7 +131,7 @@
             <button id="fill-fog" style="background:#555;">Copri</button>
         </div>
 
-        <label>Evidenziatore (Tratto Magico):</label>
+        <label>Evidenziatore (Sul Layer):</label>
         <div class="row" style="justify-content: space-between;">
             <button id="tool-hl-red" class="color-btn bg-red" title="Rosso"></button>
             <button id="tool-hl-green" class="color-btn bg-green" title="Verde"></button>
@@ -179,13 +179,11 @@
 
 <div id="viewport">
     <div id="world-container">
-        <svg id="drawings-svg" xmlns="http://www.w3.org/2000/svg" viewBox="-50000 -50000 100000 100000"></svg>
     </div>
     <div id="calibration-square"></div>
 </div>
 
 <script>
-// GESTORE ERRORI GLOBALE
 window.onerror = function(msg, url, lineNo, columnNo, error) {
     alert("ERRORE SUL TABLET:\n" + msg + "\nRiga: " + lineNo);
     return false;
@@ -212,7 +210,6 @@ try {
 
     const viewport = document.getElementById('viewport');
     const worldContainer = document.getElementById('world-container');
-    const drawingsSvg = document.getElementById('drawings-svg');
     const atmosphereOverlay = document.getElementById('atmosphere-overlay');
     const sceneListEl = document.getElementById('scene-list');
     const layerListEl = document.getElementById('layer-list');
@@ -280,16 +277,14 @@ try {
         }
     }
 
-    function renderDrawings() {
-        // Metodo sicuro per pulire gli SVG in tutti i browser
-        while (drawingsSvg.firstChild) {
-            drawingsSvg.removeChild(drawingsSvg.firstChild);
+    function renderLayerDrawings(layer) {
+        if (!layer || !layer.svg) return;
+        while (layer.svg.firstChild) {
+            layer.svg.removeChild(layer.svg.firstChild);
         }
+        if (!layer.drawings) return;
         
-        const scene = scenes.find(s => s.id === currentSceneId);
-        if(!scene || !scene.drawings) return;
-        
-        scene.drawings.forEach(path => {
+        layer.drawings.forEach(path => {
             const polyline = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
             polyline.setAttribute("fill", "none");
             polyline.setAttribute("stroke", path.color);
@@ -299,7 +294,7 @@ try {
             polyline.setAttribute("opacity", "0.7");
             const pointsStr = path.points.map(p => `${p.x},${p.y}`).join(" ");
             polyline.setAttribute("points", pointsStr);
-            drawingsSvg.appendChild(polyline);
+            layer.svg.appendChild(polyline);
         });
     }
 
@@ -317,7 +312,7 @@ try {
         const newScene = { 
             id: sceneCounter, name: `Scena ${sceneCounter}`, layers: [], 
             panX: 0, panY: 0, scale: 1, cameraLocked: false,
-            filter: 'none', drawings: []
+            filter: 'none'
         };
         scenes.push(newScene);
         switchScene(newScene.id);
@@ -331,19 +326,19 @@ try {
         renderSceneList();
         
         Array.from(worldContainer.children).forEach(c => {
-            if(c.id !== 'drawings-svg' && !c.classList.contains('ping-marker')) c.remove();
+            if(!c.classList.contains('ping-marker')) c.remove();
         });
         
         scene.layers.forEach(layer => { 
             worldContainer.appendChild(layer.wrapper); 
             updateLayerTransform(layer); 
             applyLayerVolume(layer);
+            renderLayerDrawings(layer);
         });
         
         applyWorldTransform(scene.panX, scene.panY, scene.scale);
         updateCameraLockUI(scene);
         applySceneAtmosphere(scene);
-        renderDrawings();
         renderLayers();
     }
 
@@ -415,12 +410,17 @@ try {
                 const ctx = canvas.getContext('2d');
                 wrapper.appendChild(canvas);
 
+                const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+                svg.setAttribute("class", "layer-drawings");
+                svg.setAttribute("viewBox", `-50000 -50000 100000 100000`);
+                wrapper.appendChild(svg);
+
                 if (existingFogData) {
                     const fogImg = new Image();
-                    fogImg.onload = () => { ctx.drawImage(fogImg, 0, 0); resolve({ wrapper, canvas, ctx, mediaEl }); };
+                    fogImg.onload = () => { ctx.drawImage(fogImg, 0, 0); resolve({ wrapper, canvas, ctx, mediaEl, svg }); };
                     fogImg.src = existingFogData;
                 } else {
-                    resolve({ wrapper, canvas, ctx, mediaEl });
+                    resolve({ wrapper, canvas, ctx, mediaEl, svg });
                 }
             }
         });
@@ -439,7 +439,9 @@ try {
         activeLayerId = newLayer.id; 
         updateToolUI('layer');
         worldContainer.appendChild(newLayer.wrapper);
-        updateLayerTransform(newLayer);
+        
+        // Assegniamo lo z-index corretto a tutti
+        scene.layers.forEach(l => updateLayerTransform(l));
         renderLayers();
     }
 
@@ -447,7 +449,11 @@ try {
         const rot = layer.rotation || 0;
         layer.wrapper.style.transform = `translate(${layer.x}px, ${layer.y}px) scale(${layer.scale}) rotate(${rot}deg)`;
         layer.wrapper.style.display = layer.visible ? 'block' : 'none';
-        layer.wrapper.style.zIndex = layer.id;
+        
+        const scene = scenes.find(s => s.id === currentSceneId);
+        if (scene) {
+            layer.wrapper.style.zIndex = scene.layers.indexOf(layer);
+        }
     }
 
     function renameLayer(id) {
@@ -466,7 +472,13 @@ try {
     
     document.getElementById('clear-drawings').onclick = () => {
         const scene = scenes.find(s => s.id === currentSceneId);
-        if(scene) { scene.drawings = []; renderDrawings(); }
+        const layer = scene?.layers.find(l => l.id === activeLayerId);
+        if(layer) { 
+            layer.drawings = []; 
+            renderLayerDrawings(layer); 
+        } else {
+            alert("Seleziona prima un livello su cui vuoi cancellare i disegni.");
+        }
     };
 
     btnLockCamera.onclick = () => {
@@ -496,9 +508,9 @@ try {
         layerCounter++;
         const newLayer = {
             id: layerCounter, name: `YouTube Mappa`, fileName: `YT: ${ytId}`, imgSrc: null, ytId: ytId, 
-            nWidth: nWidth, nHeight: nHeight, wrapper: domElements.wrapper, canvas: domElements.canvas, ctx: domElements.ctx, mediaEl: domElements.mediaEl,
+            nWidth: nWidth, nHeight: nHeight, wrapper: domElements.wrapper, canvas: domElements.canvas, ctx: domElements.ctx, mediaEl: domElements.mediaEl, svg: domElements.svg,
             fogRatio: fogRatio, x: 0, y: 0, scale: 1, rotation: 0, volume: 0, visible: true, lockMove: false, lockScale: false,
-            isVideo: false, needsRelink: false
+            isVideo: false, needsRelink: false, drawings: []
         };
         
         finalizeLayerAddition(scene, newLayer, nWidth, nHeight);
@@ -521,9 +533,9 @@ try {
             layerCounter++;
             const newLayer = {
                 id: layerCounter, name: `Livello ${scene.layers.length + 1}`, fileName: file.name, imgSrc: isVideo ? null : objectUrl, ytId: null,
-                nWidth: nWidth, nHeight: nHeight, wrapper: domElements.wrapper, canvas: domElements.canvas, ctx: domElements.ctx, mediaEl: domElements.mediaEl,
+                nWidth: nWidth, nHeight: nHeight, wrapper: domElements.wrapper, canvas: domElements.canvas, ctx: domElements.ctx, mediaEl: domElements.mediaEl, svg: domElements.svg,
                 fogRatio: fogRatio, x: 0, y: 0, scale: 1, rotation: 0, volume: 0, visible: true, lockMove: false, lockScale: false,
-                isVideo: isVideo, needsRelink: false
+                isVideo: isVideo, needsRelink: false, drawings: []
             };
             
             finalizeLayerAddition(scene, newLayer, nWidth, nHeight);
@@ -610,12 +622,13 @@ try {
                     sceneCounter: sceneCounter, layerCounter: layerCounter,
                     scenes: scenes.map(scene => ({
                         id: scene.id, name: scene.name, panX: scene.panX, panY: scene.panY, scale: scene.scale, cameraLocked: scene.cameraLocked || false,
-                        filter: scene.filter, drawings: scene.drawings || [],
+                        filter: scene.filter,
                         layers: scene.layers.map(layer => ({
                             id: layer.id, name: layer.name, fileName: layer.fileName || "Media",
                             imgSrc: layer.imgSrc, ytId: layer.ytId || null, nWidth: layer.nWidth, nHeight: layer.nHeight, fogRatio: layer.fogRatio,
                             fogData: layer.canvas.toDataURL(), x: layer.x, y: layer.y, scale: layer.scale, rotation: layer.rotation || 0, volume: layer.volume || 0,
-                            visible: layer.visible, lockMove: layer.lockMove, lockScale: layer.lockScale, isVideo: layer.isVideo || false
+                            visible: layer.visible, lockMove: layer.lockMove, lockScale: layer.lockScale, isVideo: layer.isVideo || false,
+                            drawings: layer.drawings || []
                         }))
                     }))
                 };
@@ -651,7 +664,7 @@ try {
                 for (const sceneData of data.scenes) {
                     const newScene = {
                         id: sceneData.id, name: sceneData.name, panX: sceneData.panX, panY: sceneData.panY, scale: sceneData.scale, cameraLocked: sceneData.cameraLocked || false,
-                        filter: sceneData.filter || 'none', drawings: sceneData.drawings || [], layers: []
+                        filter: sceneData.filter || 'none', layers: []
                     };
 
                     for (const layerData of sceneData.layers) {
@@ -665,12 +678,13 @@ try {
                         const createdLayer = {
                             id: layerData.id, name: layerData.name, fileName: layerData.fileName,
                             imgSrc: layerData.imgSrc, ytId: ytId, nWidth: layerData.nWidth, nHeight: layerData.nHeight, fogRatio: layerData.fogRatio,
-                            wrapper: domElements.wrapper, canvas: domElements.canvas, ctx: domElements.ctx, mediaEl: domElements.mediaEl,
+                            wrapper: domElements.wrapper, canvas: domElements.canvas, ctx: domElements.ctx, mediaEl: domElements.mediaEl, svg: domElements.svg,
                             x: layerData.x, y: layerData.y, scale: layerData.scale, rotation: layerData.rotation || 0, volume: layerData.volume || 0,
                             visible: layerData.visible, lockMove: layerData.lockMove || false, lockScale: layerData.lockScale || false,
-                            isVideo: isVid, needsRelink: needsRelink
+                            isVideo: isVid, needsRelink: needsRelink, drawings: layerData.drawings || []
                         };
                         newScene.layers.push(createdLayer);
+                        renderLayerDrawings(createdLayer);
                         setTimeout(() => applyLayerVolume(createdLayer), 1500);
                     }
                     scenes.push(newScene);
@@ -726,23 +740,63 @@ try {
             nameEl.innerText = layer.name + (layer.ytId ? " 🔴" : (layer.isVideo ? " 🎥" : "")); 
             nameEl.onclick = () => { activeLayerId = layer.id; if(currentMode === 'camera') updateToolUI('layer'); else renderLayers(); };
             
+            // PULSANTI DI SPOSTAMENTO LIVELLI 🔼 🔽
+            const btnUp = document.createElement('button'); btnUp.className = 'btn-icon'; btnUp.innerText = '🔼'; btnUp.title = "Sposta Su";
+            btnUp.onclick = (e) => { 
+                e.stopPropagation(); 
+                const idx = scene.layers.indexOf(layer);
+                if (idx < scene.layers.length - 1) {
+                    scene.layers[idx] = scene.layers[idx + 1];
+                    scene.layers[idx + 1] = layer;
+                    scene.layers.forEach(l => updateLayerTransform(l));
+                    renderLayers();
+                }
+            };
+            
+            const btnDown = document.createElement('button'); btnDown.className = 'btn-icon'; btnDown.innerText = '🔽'; btnDown.title = "Sposta Giù";
+            btnDown.onclick = (e) => { 
+                e.stopPropagation(); 
+                const idx = scene.layers.indexOf(layer);
+                if (idx > 0) {
+                    scene.layers[idx] = scene.layers[idx - 1];
+                    scene.layers[idx - 1] = layer;
+                    scene.layers.forEach(l => updateLayerTransform(l));
+                    renderLayers();
+                }
+            };
+
             const btnVis = document.createElement('button'); btnVis.className = `btn-icon ${layer.visible ? '' : 'danger'}`; btnVis.innerText = layer.visible ? '👁️' : '❌'; 
-            btnVis.title = "Visibilità"; btnVis.onclick = () => { layer.visible = !layer.visible; updateLayerTransform(layer); renderLayers(); };
+            btnVis.title = "Visibilità"; btnVis.onclick = (e) => { e.stopPropagation(); layer.visible = !layer.visible; updateLayerTransform(layer); renderLayers(); };
             
             const btnLockMove = document.createElement('button'); btnLockMove.className = `btn-icon ${layer.lockMove ? 'danger' : ''}`; btnLockMove.innerText = layer.lockMove ? '📍' : '✋'; 
-            btnLockMove.title = "Blocca Movimento"; btnLockMove.onclick = () => { layer.lockMove = !layer.lockMove; renderLayers(); };
+            btnLockMove.title = "Blocca Movimento"; btnLockMove.onclick = (e) => { e.stopPropagation(); layer.lockMove = !layer.lockMove; renderLayers(); };
 
             const btnLockScale = document.createElement('button'); btnLockScale.className = `btn-icon ${layer.lockScale ? 'danger' : ''}`; btnLockScale.innerText = layer.lockScale ? '🔒' : '🔎'; 
-            btnLockScale.title = "Blocca Zoom"; btnLockScale.onclick = () => { layer.lockScale = !layer.lockScale; renderLayers(); };
+            btnLockScale.title = "Blocca Zoom"; btnLockScale.onclick = (e) => { e.stopPropagation(); layer.lockScale = !layer.lockScale; renderLayers(); };
             
-            const btnRename = document.createElement('button'); btnRename.className = 'btn-icon'; btnRename.innerText = '✏️'; btnRename.onclick = () => renameLayer(layer.id);
-            const btnDel = document.createElement('button'); btnDel.className = 'btn-icon'; btnDel.innerText = '🗑️'; btnDel.onclick = () => { scene.layers = scene.layers.filter(l => l.id !== layer.id); if (activeLayerId === layer.id) activeLayerId = null; layer.wrapper.remove(); renderLayers(); };
+            const btnRename = document.createElement('button'); btnRename.className = 'btn-icon'; btnRename.innerText = '✏️'; btnRename.onclick = (e) => { e.stopPropagation(); renameLayer(layer.id); };
+            const btnDel = document.createElement('button'); btnDel.className = 'btn-icon'; btnDel.innerText = '🗑️'; 
+            btnDel.onclick = (e) => { 
+                e.stopPropagation();
+                scene.layers = scene.layers.filter(l => l.id !== layer.id); 
+                if (activeLayerId === layer.id) activeLayerId = null; 
+                layer.wrapper.remove(); 
+                scene.layers.forEach(l => updateLayerTransform(l));
+                renderLayers(); 
+            };
 
-            row.appendChild(nameEl); row.appendChild(btnVis); row.appendChild(btnLockMove); row.appendChild(btnLockScale); row.appendChild(btnRename); row.appendChild(btnDel);
+            row.appendChild(nameEl); 
+            row.appendChild(btnUp); 
+            row.appendChild(btnDown);
+            row.appendChild(btnVis); 
+            row.appendChild(btnLockMove); 
+            row.appendChild(btnLockScale); 
+            row.appendChild(btnRename); 
+            row.appendChild(btnDel);
             
             if (layer.needsRelink) {
                 const btnRelink = document.createElement('button'); btnRelink.className = 'btn-relink'; btnRelink.innerText = `🎥 Ricarica: ${layer.fileName}`;
-                btnRelink.onclick = () => { layerToRelink = layer; document.getElementById('upload-relink').click(); };
+                btnRelink.onclick = (e) => { e.stopPropagation(); layerToRelink = layer; document.getElementById('upload-relink').click(); };
                 row.appendChild(btnRelink);
             }
             layerListEl.appendChild(row);
@@ -817,14 +871,14 @@ try {
         return { x: (screenX - scene.panX) / scene.scale, y: (screenY - scene.panY) / scene.scale };
     }
 
-    function getLayerLocalCoords(screenX, screenY, scene, layer) {
+    function getLayerLocalCoordsRaw(screenX, screenY, scene, layer) {
         const worldCoords = getWorldCoords(screenX, screenY, scene);
         const cx = layer.x + layer.nWidth / 2; const cy = layer.y + layer.nHeight / 2;
         const dx = (worldCoords.x - cx) / layer.scale; const dy = (worldCoords.y - cy) / layer.scale;
         const rad = (layer.rotation || 0) * Math.PI / 180;
         const localX = (layer.nWidth / 2) + dx * Math.cos(rad) + dy * Math.sin(rad);
         const localY = (layer.nHeight / 2) - dx * Math.sin(rad) + dy * Math.cos(rad);
-        return { x: localX * layer.fogRatio, y: localY * layer.fogRatio };
+        return { x: localX, y: localY };
     }
 
     function performDraw() {
@@ -858,7 +912,6 @@ try {
 
         const pos = getPointerPos(e);
 
-        // Ping Magico
         pingTimer = setTimeout(() => {
             isInteracting = false; currentPath = null;
             const wPos = getWorldCoords(pos.x, pos.y, scene);
@@ -872,21 +925,23 @@ try {
             if (!activeLayer.lockMove) {
                 startX = ((pos.x - scene.panX) / scene.scale) - activeLayer.x; startY = ((pos.y - scene.panY) / scene.scale) - activeLayer.y;
             }
-        } else if (currentMode.startsWith('hl-')) {
-            const wPos = getWorldCoords(pos.x, pos.y, scene);
+        } else if (currentMode.startsWith('hl-') && activeLayer) {
+            const rawPos = getLayerLocalCoordsRaw(pos.x, pos.y, scene, activeLayer);
             const colorMap = { 'hl-red': '#ff3333', 'hl-green': '#33ff33', 'hl-yellow': '#ffff33' };
-            const brushThickness = document.getElementById('brush-size').value / scene.scale;
-            currentPath = { color: colorMap[currentMode], width: brushThickness, points: [wPos] };
-            if (!scene.drawings) scene.drawings = [];
-            scene.drawings.push(currentPath);
-            renderDrawings();
+            const brushThickness = document.getElementById('brush-size').value / scene.scale / activeLayer.scale;
+            currentPath = { color: colorMap[currentMode], width: brushThickness, points: [rawPos] };
+            if (!activeLayer.drawings) activeLayer.drawings = [];
+            activeLayer.drawings.push(currentPath);
+            renderLayerDrawings(activeLayer);
         } else if ((currentMode === 'draw' || currentMode === 'erase') && activeLayer) {
-            const localPos = getLayerLocalCoords(pos.x, pos.y, scene, activeLayer);
+            const rawPos = getLayerLocalCoordsRaw(pos.x, pos.y, scene, activeLayer);
             activeLayer.ctx.lineWidth = (document.getElementById('brush-size').value / scene.scale / activeLayer.scale) * activeLayer.fogRatio;
             activeLayer.ctx.lineCap = 'round'; activeLayer.ctx.lineJoin = 'round';
             activeLayer.ctx.globalCompositeOperation = currentMode === 'draw' ? 'source-over' : 'destination-out';
             activeLayer.ctx.strokeStyle = 'black';
-            drawCurrX = drawLastX = localPos.x; drawCurrY = drawLastY = localPos.y;
+            drawCurrX = rawPos.x * activeLayer.fogRatio; 
+            drawCurrY = rawPos.y * activeLayer.fogRatio;
+            drawLastX = drawCurrX; drawLastY = drawCurrY;
             activeLayer.ctx.beginPath(); activeLayer.ctx.moveTo(drawCurrX, drawCurrY); activeLayer.ctx.lineTo(drawCurrX+0.1, drawCurrY+0.1); activeLayer.ctx.stroke();
         }
     }
@@ -924,23 +979,27 @@ try {
                 activeLayer.y = ((pos.y - scene.panY) / scene.scale) - startY; 
                 updateLayerTransform(activeLayer);
             }
-        } else if (currentMode.startsWith('hl-') && currentPath) {
-            const wPos = getWorldCoords(pos.x, pos.y, scene);
-            currentPath.points.push(wPos);
+        } else if (currentMode.startsWith('hl-') && currentPath && activeLayer) {
+            const rawPos = getLayerLocalCoordsRaw(pos.x, pos.y, scene, activeLayer);
+            currentPath.points.push(rawPos);
+            
             if (!pendingDraw) {
                 pendingDraw = true;
                 requestAnimationFrame(() => {
-                    const polylines = drawingsSvg.querySelectorAll('polyline');
-                    if (polylines.length > 0) {
-                        const lastPoly = polylines[polylines.length - 1];
-                        lastPoly.setAttribute("points", currentPath.points.map(p => `${p.x},${p.y}`).join(" "));
+                    if (currentPath && activeLayer && activeLayer.svg) {
+                        const polylines = activeLayer.svg.querySelectorAll('polyline');
+                        if (polylines.length > 0) {
+                            const lastPoly = polylines[polylines.length - 1];
+                            lastPoly.setAttribute("points", currentPath.points.map(p => `${p.x},${p.y}`).join(" "));
+                        }
                     }
                     pendingDraw = false;
                 });
             }
         } else if ((currentMode === 'draw' || currentMode === 'erase') && activeLayer) {
-            const localPos = getLayerLocalCoords(pos.x, pos.y, scene, activeLayer);
-            drawCurrX = localPos.x; drawCurrY = localPos.y;
+            const rawPos = getLayerLocalCoordsRaw(pos.x, pos.y, scene, activeLayer);
+            drawCurrX = rawPos.x * activeLayer.fogRatio; 
+            drawCurrY = rawPos.y * activeLayer.fogRatio;
             if (!pendingDraw) {
                 pendingDraw = true;
                 requestAnimationFrame(() => {
