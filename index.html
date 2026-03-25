@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>D&D Tavolo Proiettore - V24 Perfect Bounds</title>
+    <title>D&D Tavolo Proiettore - V25 Layered Weather</title>
     <style>
         /* Regola globale per margini perfetti */
         *, *::before, *::after { box-sizing: border-box; }
@@ -13,7 +13,7 @@
         #viewport { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
         #world-container { position: absolute; top: 0; left: 0; transform-origin: 0 0; will-change: transform; width: 0; height: 0; }
         
-        /* Overflow hidden taglia disegni e nebbia al bordo del layer */
+        /* Overflow hidden taglia disegni, nebbia e meteo al bordo del layer */
         .layer-wrapper { position: absolute; top: 0; left: 0; transform-origin: center; will-change: transform; overflow: hidden; }
         
         /* Gestione Z-index interna al wrapper per i vari strati */
@@ -28,7 +28,7 @@
         }
         .ping-marker { position: absolute; width: 60px; height: 60px; background: radial-gradient(circle, rgba(255,50,50,0.6) 0%, transparent 70%); border: 3px solid red; border-radius: 50%; transform-origin: center; animation: ping-anim 1.5s ease-out; pointer-events: none; z-index: 9999; margin-left: -30px; margin-top: -30px; }
 
-        /* Filtri Atmosfera Applicati AL LAYER */
+        /* Filtri Atmosfera (Applicati al layer specifico) */
         @keyframes pulse-fire { 0% { background: rgba(255, 60, 0, 0.25); } 100% { background: rgba(200, 20, 0, 0.4); } }
         @keyframes rain-fall { 0% { background-position: 0px 0px, 0px 0px; } 100% { background-position: 20px 500px, 40px 800px; } }
         @keyframes snow-fall { 0% { background-position: 0px 0px, 0px 0px; } 100% { background-position: 100px 400px, -50px 600px; } }
@@ -39,12 +39,12 @@
         .filter-swamp { background: rgba(30, 80, 20, 0.5); mix-blend-mode: multiply; }
         .filter-blood { background: rgba(120, 0, 0, 0.6); mix-blend-mode: multiply; }
         
-        /* Pioggia ridotta e alleggerita */
+        /* Pioggia ridotta, molto più leggera e delicata */
         .filter-rain {
-            background-color: rgba(30, 40, 50, 0.3);
-            background-image: url("data:image/svg+xml,%3Csvg width='30' height='100' viewBox='0 0 30 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cline x1='20' y1='0' x2='10' y2='30' stroke='rgba(200,200,255,0.3)' stroke-width='1.5'/%3E%3C/svg%3E"), 
-                              url("data:image/svg+xml,%3Csvg width='60' height='160' viewBox='0 0 60 160' xmlns='http://www.w3.org/2000/svg'%3E%3Cline x1='40' y1='0' x2='20' y2='50' stroke='rgba(200,200,255,0.15)' stroke-width='1'/%3E%3C/svg%3E");
-            animation: rain-fall 0.4s linear infinite;
+            background-color: rgba(20, 30, 40, 0.1);
+            background-image: url("data:image/svg+xml,%3Csvg width='60' height='150' viewBox='0 0 60 150' xmlns='http://www.w3.org/2000/svg'%3E%3Cline x1='40' y1='0' x2='30' y2='25' stroke='rgba(200,200,255,0.15)' stroke-width='1'/%3E%3C/svg%3E"), 
+                              url("data:image/svg+xml,%3Csvg width='120' height='250' viewBox='0 0 120 250' xmlns='http://www.w3.org/2000/svg'%3E%3Cline x1='80' y1='0' x2='60' y2='40' stroke='rgba(200,200,255,0.08)' stroke-width='0.8'/%3E%3C/svg%3E");
+            animation: rain-fall 0.8s linear infinite;
         }
         
         .filter-snow {
@@ -175,7 +175,7 @@
 
     <div class="acc-btn">🌗 Atmosfera e Calibrazione</div>
     <div class="acc-content">
-        <label>Filtro Meteo (Sul Layer):</label>
+        <label>Filtro Meteo (Sul Layer Attivo):</label>
         <select id="atmosphere-select">
             <option value="none">☀️ Nessuno (Giorno)</option>
             <option value="night">🌙 Notte Oscura</option>
@@ -201,8 +201,7 @@
 <input type="file" id="upload-relink" accept="video/*" class="hidden">
 
 <div id="viewport">
-    <div id="world-container">
-    </div>
+    <div id="world-container"></div>
     <div id="calibration-square"></div>
 </div>
 
@@ -291,16 +290,13 @@ try {
         }
     }
 
-    function applySceneAtmosphere(scene) {
-        document.getElementById('atmosphere-select').value = scene.filter || 'none';
-        scene.layers.forEach(layer => {
-            if (layer.atmosphereEl) {
-                layer.atmosphereEl.className = 'layer-atmosphere';
-                if(scene.filter && scene.filter !== 'none') {
-                    layer.atmosphereEl.classList.add(`filter-${scene.filter}`);
-                }
-            }
-        });
+    // NUOVO APPLICATORE METEO: Applica l'effetto esclusivamente al Layer specifico
+    function applyLayerAtmosphere(layer) {
+        if (!layer || !layer.atmosphereEl) return;
+        layer.atmosphereEl.className = 'layer-atmosphere'; 
+        if(layer.filter && layer.filter !== 'none') {
+            layer.atmosphereEl.classList.add(`filter-${layer.filter}`);
+        }
     }
 
     function renderLayerDrawings(layer) {
@@ -337,8 +333,7 @@ try {
         sceneCounter++;
         const newScene = { 
             id: sceneCounter, name: `Scena ${sceneCounter}`, layers: [], 
-            panX: 0, panY: 0, scale: 1, cameraLocked: false,
-            filter: 'none'
+            panX: 0, panY: 0, scale: 1, cameraLocked: false
         };
         scenes.push(newScene);
         switchScene(newScene.id);
@@ -360,11 +355,11 @@ try {
             updateLayerTransform(layer); 
             applyLayerVolume(layer);
             renderLayerDrawings(layer);
+            applyLayerAtmosphere(layer); 
         });
         
         applyWorldTransform(scene.panX, scene.panY, scene.scale);
         updateCameraLockUI(scene);
-        applySceneAtmosphere(scene);
         renderLayers();
     }
 
@@ -428,8 +423,8 @@ try {
                 wrapper.style.height = naturalHeight + 'px';
                 mediaEl.className = 'layer-img'; 
                 wrapper.appendChild(mediaEl);
-
-                // Atmosfera del layer
+                
+                // Meteo interno al wrapper del layer
                 const atmosphere = document.createElement('div');
                 atmosphere.className = 'layer-atmosphere';
                 wrapper.appendChild(atmosphere);
@@ -441,7 +436,6 @@ try {
                 const ctx = canvas.getContext('2d');
                 wrapper.appendChild(canvas);
 
-                // Disegni SVG perfettamente allineati
                 const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
                 svg.setAttribute("class", "layer-drawings");
                 svg.setAttribute("viewBox", `0 0 ${naturalWidth} ${naturalHeight}`);
@@ -474,7 +468,7 @@ try {
         
         scene.layers.forEach(l => updateLayerTransform(l));
         renderLayers();
-        applySceneAtmosphere(scene); // Applica meteo se già selezionato nella scena
+        applyLayerAtmosphere(newLayer);
     }
 
     function updateLayerTransform(layer) {
@@ -499,7 +493,14 @@ try {
 
     document.getElementById('atmosphere-select').onchange = (e) => {
         const scene = scenes.find(s => s.id === currentSceneId);
-        if(scene) { scene.filter = e.target.value; applySceneAtmosphere(scene); }
+        const layer = scene?.layers.find(l => l.id === activeLayerId);
+        if(layer) { 
+            layer.filter = e.target.value; 
+            applyLayerAtmosphere(layer); 
+        } else {
+            alert("Seleziona prima un livello per applicare un filtro meteo.");
+            e.target.value = 'none';
+        }
     };
     
     document.getElementById('clear-drawings').onclick = () => {
@@ -542,7 +543,7 @@ try {
             id: layerCounter, name: `YouTube Mappa`, fileName: `YT: ${ytId}`, imgSrc: null, ytId: ytId, 
             nWidth: nWidth, nHeight: nHeight, wrapper: domElements.wrapper, canvas: domElements.canvas, ctx: domElements.ctx, mediaEl: domElements.mediaEl, atmosphereEl: domElements.atmosphereEl, svg: domElements.svg,
             fogRatio: fogRatio, x: 0, y: 0, scale: 1, rotation: 0, volume: 0, visible: true, lockMove: false, lockScale: false,
-            isVideo: false, needsRelink: false, drawings: []
+            isVideo: false, needsRelink: false, drawings: [], filter: 'none'
         };
         
         finalizeLayerAddition(scene, newLayer, nWidth, nHeight);
@@ -567,7 +568,7 @@ try {
                 id: layerCounter, name: `Livello ${scene.layers.length + 1}`, fileName: file.name, imgSrc: isVideo ? null : objectUrl, ytId: null,
                 nWidth: nWidth, nHeight: nHeight, wrapper: domElements.wrapper, canvas: domElements.canvas, ctx: domElements.ctx, mediaEl: domElements.mediaEl, atmosphereEl: domElements.atmosphereEl, svg: domElements.svg,
                 fogRatio: fogRatio, x: 0, y: 0, scale: 1, rotation: 0, volume: 0, visible: true, lockMove: false, lockScale: false,
-                isVideo: isVideo, needsRelink: false, drawings: []
+                isVideo: isVideo, needsRelink: false, drawings: [], filter: 'none'
             };
             
             finalizeLayerAddition(scene, newLayer, nWidth, nHeight);
@@ -654,13 +655,12 @@ try {
                     sceneCounter: sceneCounter, layerCounter: layerCounter,
                     scenes: scenes.map(scene => ({
                         id: scene.id, name: scene.name, panX: scene.panX, panY: scene.panY, scale: scene.scale, cameraLocked: scene.cameraLocked || false,
-                        filter: scene.filter,
                         layers: scene.layers.map(layer => ({
                             id: layer.id, name: layer.name, fileName: layer.fileName || "Media",
                             imgSrc: layer.imgSrc, ytId: layer.ytId || null, nWidth: layer.nWidth, nHeight: layer.nHeight, fogRatio: layer.fogRatio,
                             fogData: layer.canvas.toDataURL(), x: layer.x, y: layer.y, scale: layer.scale, rotation: layer.rotation || 0, volume: layer.volume || 0,
                             visible: layer.visible, lockMove: layer.lockMove, lockScale: layer.lockScale, isVideo: layer.isVideo || false,
-                            drawings: layer.drawings || []
+                            drawings: layer.drawings || [], filter: layer.filter || 'none'
                         }))
                     }))
                 };
@@ -696,7 +696,7 @@ try {
                 for (const sceneData of data.scenes) {
                     const newScene = {
                         id: sceneData.id, name: sceneData.name, panX: sceneData.panX, panY: sceneData.panY, scale: sceneData.scale, cameraLocked: sceneData.cameraLocked || false,
-                        filter: sceneData.filter || 'none', layers: []
+                        layers: []
                     };
 
                     for (const layerData of sceneData.layers) {
@@ -713,10 +713,11 @@ try {
                             wrapper: domElements.wrapper, canvas: domElements.canvas, ctx: domElements.ctx, mediaEl: domElements.mediaEl, atmosphereEl: domElements.atmosphereEl, svg: domElements.svg,
                             x: layerData.x, y: layerData.y, scale: layerData.scale, rotation: layerData.rotation || 0, volume: layerData.volume || 0,
                             visible: layerData.visible, lockMove: layerData.lockMove || false, lockScale: layerData.lockScale || false,
-                            isVideo: isVid, needsRelink: needsRelink, drawings: layerData.drawings || []
+                            isVideo: isVid, needsRelink: needsRelink, drawings: layerData.drawings || [], filter: layerData.filter || 'none'
                         };
                         newScene.layers.push(createdLayer);
                         renderLayerDrawings(createdLayer);
+                        applyLayerAtmosphere(createdLayer);
                         setTimeout(() => applyLayerVolume(createdLayer), 1500);
                     }
                     scenes.push(newScene);
@@ -746,13 +747,16 @@ try {
         
         if (!scene) {
             rotSlider.value = 0; rotDisplay.innerText = "0";
-            volSlider.value = 0; volDisplay.innerText = "0"; volSlider.disabled = true; return;
+            volSlider.value = 0; volDisplay.innerText = "0"; volSlider.disabled = true; 
+            document.getElementById('atmosphere-select').value = 'none';
+            return;
         }
 
         if (activeLayerId) {
             const activeL = scene.layers.find(l => l.id === activeLayerId);
             if (activeL) {
                 rotSlider.value = activeL.rotation || 0; rotDisplay.innerText = activeL.rotation || 0;
+                document.getElementById('atmosphere-select').value = activeL.filter || 'none';
                 if(activeL.isVideo || activeL.ytId) {
                     volSlider.disabled = false; volSlider.value = activeL.volume || 0; volDisplay.innerText = activeL.volume || 0;
                 } else {
@@ -762,6 +766,7 @@ try {
         } else {
             rotSlider.value = 0; rotDisplay.innerText = "0";
             volSlider.value = 0; volDisplay.innerText = "0"; volSlider.disabled = true;
+            document.getElementById('atmosphere-select').value = 'none';
         }
 
         [...scene.layers].reverse().forEach(layer => {
