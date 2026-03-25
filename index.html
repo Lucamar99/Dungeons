@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>D&D Tavolo Proiettore - V20 Final Patch</title>
+    <title>D&D Tavolo Proiettore - V20 Anti-Crash</title>
     <style>
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #050505; font-family: sans-serif; touch-action: none; color: #eee; }
         
@@ -192,8 +192,13 @@
 </div>
 
 <script>
-window.addEventListener('DOMContentLoaded', () => {
+// GESTORE ERRORI GLOBALE: Se c'è un problema, mostrerà un pop-up!
+window.onerror = function(msg, url, lineNo, columnNo, error) {
+    alert("ERRORE SUL TABLET:\n" + msg + "\nRiga: " + lineNo);
+    return false;
+};
 
+try {
     // --- ACCORDION LOGIC ---
     document.querySelectorAll('.acc-btn').forEach(btn => {
         btn.onclick = () => {
@@ -591,6 +596,7 @@ window.addEventListener('DOMContentLoaded', () => {
         const layer = scene?.layers.find(l => l.id === activeLayerId);
         if(layer) {
             layer.rotation = parseFloat(e.target.value);
+            rotSlider.value = layer.rotation;
             document.getElementById('rot-display').innerText = layer.rotation;
             updateLayerTransform(layer);
         }
@@ -601,7 +607,7 @@ window.addEventListener('DOMContentLoaded', () => {
         const layer = scene?.layers.find(l => l.id === activeLayerId);
         if(layer) {
             layer.rotation = 0;
-            document.getElementById('layer-rotation').value = 0;
+            rotSlider.value = 0;
             document.getElementById('rot-display').innerText = "0";
             updateLayerTransform(layer);
         }
@@ -633,10 +639,7 @@ window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-save-project').onclick = () => {
         for (let s of scenes) {
             for (let l of s.layers) {
-                if (l.imgSrc && l.imgSrc.startsWith('blob:')) {
-                    alert(`Attendi! Il file "${l.name}" è ancora in elaborazione background. Riprova tra qualche istante.`);
-                    return;
-                }
+                if (l.imgSrc && l.imgSrc.startsWith('blob:')) { alert(`Attendi elaborazione background per "${l.name}".`); return; }
             }
         }
         const customFileName = prompt("Inserisci il nome del salvataggio:", "Campagna_Dnd");
@@ -741,14 +744,14 @@ window.addEventListener('DOMContentLoaded', () => {
         layerListEl.innerHTML = '';
         
         if (!scene) {
-            document.getElementById('layer-rotation').value = 0; document.getElementById('rot-display').innerText = "0";
+            rotSlider.value = 0; document.getElementById('rot-display').innerText = "0";
             volSlider.value = 0; document.getElementById('vol-display').innerText = "0"; volSlider.disabled = true; return;
         }
 
         if (activeLayerId) {
             const activeL = scene.layers.find(l => l.id === activeLayerId);
             if (activeL) {
-                document.getElementById('layer-rotation').value = activeL.rotation || 0; document.getElementById('rot-display').innerText = activeL.rotation || 0;
+                rotSlider.value = activeL.rotation || 0; document.getElementById('rot-display').innerText = activeL.rotation || 0;
                 if(activeL.isVideo || activeL.ytId) {
                     volSlider.disabled = false; volSlider.value = activeL.volume || 0; document.getElementById('vol-display').innerText = activeL.volume || 0;
                 } else {
@@ -756,7 +759,7 @@ window.addEventListener('DOMContentLoaded', () => {
                 }
             }
         } else {
-            document.getElementById('layer-rotation').value = 0; document.getElementById('rot-display').innerText = "0";
+            rotSlider.value = 0; document.getElementById('rot-display').innerText = "0";
             volSlider.value = 0; document.getElementById('vol-display').innerText = "0"; volSlider.disabled = true;
         }
 
@@ -838,7 +841,7 @@ window.addEventListener('DOMContentLoaded', () => {
     
     function updateToolUI(mode) {
         currentMode = mode;
-        Object.values(tools).forEach(btn => btn.classList.remove('active'));
+        Object.values(tools).forEach(btn => { if(btn) btn.classList.remove('active'); });
         if(tools[mode]) tools[mode].classList.add('active');
         if ((mode === 'layer' || mode === 'draw' || mode === 'erase') && !activeLayerId) {
             const scene = scenes.find(s => s.id === currentSceneId);
@@ -846,7 +849,7 @@ window.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    Object.keys(tools).forEach(mode => { tools[mode].onclick = () => updateToolUI(mode); });
+    Object.keys(tools).forEach(mode => { if(tools[mode]) tools[mode].onclick = () => updateToolUI(mode); });
 
     document.getElementById('clear-fog').onclick = () => { const scene = scenes.find(s => s.id === currentSceneId); const layer = scene?.layers.find(l => l.id === activeLayerId); if(layer) layer.ctx.clearRect(0, 0, layer.canvas.width, layer.canvas.height); else alert("Seleziona un livello!"); };
     document.getElementById('fill-fog').onclick = () => { const scene = scenes.find(s => s.id === currentSceneId); const layer = scene?.layers.find(l => l.id === activeLayerId); if(layer) { layer.ctx.globalCompositeOperation = 'source-over'; layer.ctx.fillStyle = 'black'; layer.ctx.fillRect(0, 0, layer.canvas.width, layer.canvas.height); } else alert("Seleziona un livello!"); };
@@ -1019,14 +1022,16 @@ window.addEventListener('DOMContentLoaded', () => {
         else { revealUiBtn.classList.remove('hidden'); }
     }
 
-    const calibSquare = document.getElementById('calibration-square');
     document.getElementById('toggle-square').onclick = () => calibSquare.style.display = (calibSquare.style.display === 'none' || calibSquare.style.display === '') ? 'block' : 'none';
     document.getElementById('square-size').oninput = (e) => { calibSquare.style.width = e.target.value + 'px'; calibSquare.style.height = e.target.value + 'px'; };
 
     document.getElementById('btn-new-scene').onclick = createNewScene;
     createNewScene();
 
-}); 
+} catch (e) {
+    alert("ERRORE DI CARICAMENTO:\n" + e.message);
+    console.error(e);
+}
 </script>
 </body>
 </html>
