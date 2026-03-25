@@ -142,12 +142,12 @@
 
         <label>Proprietà Layer Attivo:</label>
         <div class="row" style="align-items: center; margin-bottom: 4px;">
-            <span style="font-size:10px; width:50px;">Rot: <span id="rot-display">0</span>°</span>
+            <span style="font-size:10px; width:40px;">Rot:</span>
             <input type="range" id="layer-rotation" min="0" max="360" value="0" style="margin-bottom: 0;">
             <button id="btn-reset-rot" style="flex: 0 0 auto; width: 35px; margin-left: 5px; padding: 2px;">0°</button>
         </div>
         <div class="row" style="align-items: center; margin-bottom: 8px;">
-            <span style="font-size:10px; width:50px;">Vol: <span id="vol-display">0</span>%</span>
+            <span style="font-size:10px; width:40px;">Vol:</span>
             <input type="range" id="layer-volume" min="0" max="100" value="0" style="margin-bottom: 0;" disabled>
         </div>
     </div>
@@ -212,7 +212,6 @@ window.addEventListener('DOMContentLoaded', () => {
     const MAX_FOG_RES = 1500;
     let layerToRelink = null;
 
-    // --- DOM ELEMENTS ---
     const viewport = document.getElementById('viewport');
     const worldContainer = document.getElementById('world-container');
     const gridOverlay = document.getElementById('grid-overlay');
@@ -222,15 +221,9 @@ window.addEventListener('DOMContentLoaded', () => {
     const layerListEl = document.getElementById('layer-list');
     const loadingOverlay = document.getElementById('loading-overlay');
     const btnLockCamera = document.getElementById('btn-lock-camera');
-    const calibSquare = document.getElementById('calibration-square');
-    
-    // Sliders & UI Elements
     const rotSlider = document.getElementById('layer-rotation');
     const volSlider = document.getElementById('layer-volume');
-    const rotDisplay = document.getElementById('rot-display');
-    const volDisplay = document.getElementById('vol-display');
-    const uiPanel = document.getElementById('ui-panel');
-    const revealUiBtn = document.getElementById('reveal-ui');
+    const calibSquare = document.getElementById('calibration-square');
 
     let currentMode = 'camera'; 
     let isInteracting = false;
@@ -280,7 +273,6 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     function applySceneAtmosphere(scene) {
-        if (!scene) return;
         atmosphereOverlay.className = '';
         document.getElementById('atmosphere-select').value = scene.filter || 'none';
         if(scene.filter && scene.filter !== 'none') {
@@ -289,7 +281,6 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     function applySceneGrid(scene) {
-        if (!scene) return;
         const active = scene.gridActive || false;
         const size = scene.gridSize || 50;
         const color = scene.gridColor || 'white';
@@ -358,7 +349,6 @@ window.addEventListener('DOMContentLoaded', () => {
     function switchScene(id) {
         currentSceneId = id; activeLayerId = null; updateToolUI('camera');
         const scene = scenes.find(s => s.id === id);
-        if (!scene) return;
         
         renderSceneList();
         
@@ -382,14 +372,12 @@ window.addEventListener('DOMContentLoaded', () => {
 
     function renameScene(id) {
         const scene = scenes.find(s => s.id === id);
-        if(!scene) return;
         const newName = prompt("Inserisci il nuovo nome della scena:", scene.name);
         if (newName) { scene.name = newName; renderSceneList(); }
     }
 
     function deleteScene(id) {
         const scene = scenes.find(s => s.id === id);
-        if(!scene) return;
         if (confirm(`Eliminare definitivamente la scena "${scene.name}"?`)) {
             scene.layers.forEach(l => { if(l.mediaEl) l.mediaEl.src = ""; });
             scenes = scenes.filter(s => s.id !== id);
@@ -400,7 +388,6 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateCameraLockUI(scene) {
-        if (!scene) return;
         if (scene.cameraLocked) {
             btnLockCamera.innerText = '🔒 Camera Bloccata'; btnLockCamera.style.background = '#d9534f';
         } else {
@@ -463,7 +450,6 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     function finalizeLayerAddition(scene, newLayer, nWidth, nHeight) {
-        if (!scene) return;
         if (scene.layers.length === 0) {
             const scaleFit = Math.min(window.innerWidth / nWidth, window.innerHeight / nHeight);
             scene.scale = scaleFit < 1 ? scaleFit : 1;
@@ -481,7 +467,6 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateLayerTransform(layer) {
-        if(!layer || !layer.wrapper) return;
         const rot = layer.rotation || 0;
         layer.wrapper.style.transform = `translate(${layer.x}px, ${layer.y}px) scale(${layer.scale}) rotate(${rot}deg)`;
         layer.wrapper.style.display = layer.visible ? 'block' : 'none';
@@ -490,9 +475,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
     function renameLayer(id) {
         const scene = scenes.find(s => s.id === currentSceneId);
-        if(!scene) return;
         const layer = scene.layers.find(l => l.id === id);
-        if(!layer) return;
         const newName = prompt("Inserisci il nuovo nome del livello:", layer.name);
         if (newName) { layer.name = newName; renderLayers(); }
     }
@@ -603,12 +586,12 @@ window.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    rotSlider.addEventListener('input', (e) => {
+    document.getElementById('layer-rotation').addEventListener('input', (e) => {
         const scene = scenes.find(s => s.id === currentSceneId);
         const layer = scene?.layers.find(l => l.id === activeLayerId);
         if(layer) {
             layer.rotation = parseFloat(e.target.value);
-            rotDisplay.innerText = layer.rotation;
+            document.getElementById('rot-display').innerText = layer.rotation;
             updateLayerTransform(layer);
         }
     });
@@ -618,8 +601,8 @@ window.addEventListener('DOMContentLoaded', () => {
         const layer = scene?.layers.find(l => l.id === activeLayerId);
         if(layer) {
             layer.rotation = 0;
-            rotSlider.value = 0;
-            rotDisplay.innerText = "0";
+            document.getElementById('layer-rotation').value = 0;
+            document.getElementById('rot-display').innerText = "0";
             updateLayerTransform(layer);
         }
     };
@@ -629,7 +612,7 @@ window.addEventListener('DOMContentLoaded', () => {
         const layer = scene?.layers.find(l => l.id === activeLayerId);
         if(layer && (layer.isVideo || layer.ytId)) {
             layer.volume = parseInt(e.target.value);
-            volDisplay.innerText = layer.volume;
+            document.getElementById('vol-display').innerText = layer.volume;
             applyLayerVolume(layer);
         }
     });
@@ -672,7 +655,7 @@ window.addEventListener('DOMContentLoaded', () => {
                         layers: scene.layers.map(layer => ({
                             id: layer.id, name: layer.name, fileName: layer.fileName || "Media",
                             imgSrc: layer.imgSrc, ytId: layer.ytId || null, nWidth: layer.nWidth, nHeight: layer.nHeight, fogRatio: layer.fogRatio,
-                            fogData: layer.canvas.toDataURL('image/png'), x: layer.x, y: layer.y, scale: layer.scale, rotation: layer.rotation || 0, volume: layer.volume || 0,
+                            fogData: layer.canvas.toDataURL(), x: layer.x, y: layer.y, scale: layer.scale, rotation: layer.rotation || 0, volume: layer.volume || 0,
                             visible: layer.visible, lockMove: layer.lockMove, lockScale: layer.lockScale, isVideo: layer.isVideo || false
                         }))
                     }))
@@ -758,23 +741,23 @@ window.addEventListener('DOMContentLoaded', () => {
         layerListEl.innerHTML = '';
         
         if (!scene) {
-            rotSlider.value = 0; rotDisplay.innerText = "0";
-            volSlider.value = 0; volDisplay.innerText = "0"; volSlider.disabled = true; return;
+            document.getElementById('layer-rotation').value = 0; document.getElementById('rot-display').innerText = "0";
+            volSlider.value = 0; document.getElementById('vol-display').innerText = "0"; volSlider.disabled = true; return;
         }
 
         if (activeLayerId) {
             const activeL = scene.layers.find(l => l.id === activeLayerId);
             if (activeL) {
-                rotSlider.value = activeL.rotation || 0; rotDisplay.innerText = activeL.rotation || 0;
+                document.getElementById('layer-rotation').value = activeL.rotation || 0; document.getElementById('rot-display').innerText = activeL.rotation || 0;
                 if(activeL.isVideo || activeL.ytId) {
-                    volSlider.disabled = false; volSlider.value = activeL.volume || 0; volDisplay.innerText = activeL.volume || 0;
+                    volSlider.disabled = false; volSlider.value = activeL.volume || 0; document.getElementById('vol-display').innerText = activeL.volume || 0;
                 } else {
-                    volSlider.disabled = true; volSlider.value = 0; volDisplay.innerText = "0";
+                    volSlider.disabled = true; volSlider.value = 0; document.getElementById('vol-display').innerText = "0";
                 }
             }
         } else {
-            rotSlider.value = 0; rotDisplay.innerText = "0";
-            volSlider.value = 0; volDisplay.innerText = "0"; volSlider.disabled = true;
+            document.getElementById('layer-rotation').value = 0; document.getElementById('rot-display').innerText = "0";
+            volSlider.value = 0; document.getElementById('vol-display').innerText = "0"; volSlider.disabled = true;
         }
 
         [...scene.layers].reverse().forEach(layer => {
@@ -815,7 +798,7 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     function scaleLayer(layer, factor, centerX, centerY, scene) {
-        if (!layer || layer.lockScale || !scene) return;
+        if (layer.lockScale) return;
         const worldX = (centerX - scene.panX) / scene.scale; const worldY = (centerY - scene.panY) / scene.scale;
         const cx = layer.x + layer.nWidth / 2; const cy = layer.y + layer.nHeight / 2;
         const dx = (worldX - cx); const dy = (worldY - cy);
@@ -873,12 +856,10 @@ window.addEventListener('DOMContentLoaded', () => {
     function getMid(touches) { return { x: (touches[0].clientX + touches[1].clientX) / 2, y: (touches[0].clientY + touches[1].clientY) / 2 }; }
 
     function getWorldCoords(screenX, screenY, scene) {
-        if(!scene) return {x:0, y:0};
         return { x: (screenX - scene.panX) / scene.scale, y: (screenY - scene.panY) / scene.scale };
     }
 
     function getLayerLocalCoords(screenX, screenY, scene, layer) {
-        if(!scene || !layer) return {x:0, y:0};
         const worldCoords = getWorldCoords(screenX, screenY, scene);
         const cx = layer.x + layer.nWidth / 2; const cy = layer.y + layer.nHeight / 2;
         const dx = (worldCoords.x - cx) / layer.scale; const dy = (worldCoords.y - cy) / layer.scale;
@@ -910,8 +891,6 @@ window.addEventListener('DOMContentLoaded', () => {
         e.preventDefault();
         
         const scene = scenes.find(s => s.id === currentSceneId);
-        if (!scene) return;
-        
         const activeLayer = scene.layers.find(l => l.id === activeLayerId);
         isInteracting = true;
 
@@ -959,8 +938,6 @@ window.addEventListener('DOMContentLoaded', () => {
         if (!isInteracting) return;
         e.preventDefault();
         const scene = scenes.find(s => s.id === currentSceneId);
-        if (!scene) return;
-        
         const activeLayer = scene?.layers.find(l => l.id === activeLayerId);
 
         if (e.touches && e.touches.length === 2) {
@@ -1030,6 +1007,9 @@ window.addEventListener('DOMContentLoaded', () => {
         else if (document.exitFullscreen) document.exitFullscreen();
     };
 
+    const uiPanel = document.getElementById('ui-panel');
+    const revealUiBtn = document.getElementById('reveal-ui');
+
     document.getElementById('hide-ui').onclick = () => { uiPanel.classList.add('hidden'); revealUiBtn.classList.remove('hidden'); isCinemaMode = false; };
     revealUiBtn.onclick = () => { uiPanel.classList.remove('hidden'); revealUiBtn.classList.add('hidden'); isCinemaMode = false; };
 
@@ -1039,6 +1019,7 @@ window.addEventListener('DOMContentLoaded', () => {
         else { revealUiBtn.classList.remove('hidden'); }
     }
 
+    const calibSquare = document.getElementById('calibration-square');
     document.getElementById('toggle-square').onclick = () => calibSquare.style.display = (calibSquare.style.display === 'none' || calibSquare.style.display === '') ? 'block' : 'none';
     document.getElementById('square-size').oninput = (e) => { calibSquare.style.width = e.target.value + 'px'; calibSquare.style.height = e.target.value + 'px'; };
 
