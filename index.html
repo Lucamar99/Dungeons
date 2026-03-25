@@ -3,8 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>D&D Tavolo Proiettore - V20 Final Patch</title>
+    <title>D&D Tavolo Proiettore - V20 Clean Edition</title>
     <style>
+        /* Regola globale per mantenere perfetti tutti i margini e i bottoni dell'interfaccia */
+        *, *::before, *::after { box-sizing: border-box; }
+        
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #050505; font-family: sans-serif; touch-action: none; color: #eee; }
         
         #viewport { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
@@ -14,9 +17,8 @@
         .layer-img { width: 100%; height: 100%; object-fit: fill; display: block; pointer-events: none; border: none; }
         .fog-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
         
-        /* Griglia, Disegni e Ping */
-        #grid-overlay { position: absolute; top: -5000px; left: -5000px; width: 10000px; height: 10000px; pointer-events: none; z-index: 400; display: none; }
-        #drawings-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; z-index: 500; }
+        /* Disegni e Ping (Con tela SVG estesa a 100.000px per evitare i bug dei browser tablet) */
+        #drawings-svg { position: absolute; top: -50000px; left: -50000px; width: 100000px; height: 100000px; overflow: visible; pointer-events: none; z-index: 9000; }
         
         @keyframes ping-anim {
             0% { transform: scale(0); opacity: 1; border-width: 10px; }
@@ -152,7 +154,7 @@
         </div>
     </div>
 
-    <div class="acc-btn">🌗 Atmosfera e Griglia</div>
+    <div class="acc-btn">🌗 Atmosfera e Calibrazione</div>
     <div class="acc-content">
         <label>Filtro Globale:</label>
         <select id="atmosphere-select">
@@ -162,15 +164,7 @@
             <option value="sepia">📜 Antico / Locanda</option>
         </select>
 
-        <label>Griglia Tattica:</label>
-        <div class="row">
-            <button id="toggle-grid" style="background: #555;">Attiva Griglia</button>
-            <button id="color-grid" style="background: #fff; color: #000;">Colore: Bianco</button>
-        </div>
-        <label>Dimensione Griglia:</label>
-        <input type="range" id="grid-size" min="20" max="300" value="50">
-
-        <label>Calibrazione Proiettore:</label>
+        <label style="margin-top: 15px;">Calibrazione Proiettore:</label>
         <button id="toggle-square" style="background: #d9831f; margin-bottom:5px;">Mostra Quadrato Rosso</button>
         <input type="range" id="square-size" min="1" max="1000" value="50">
     </div>
@@ -185,8 +179,7 @@
 
 <div id="viewport">
     <div id="world-container">
-        <div id="grid-overlay"></div>
-        <svg id="drawings-svg"></svg>
+        <svg id="drawings-svg" xmlns="http://www.w3.org/2000/svg" viewBox="-50000 -50000 100000 100000"></svg>
     </div>
     <div id="calibration-square"></div>
 </div>
@@ -219,7 +212,6 @@ try {
 
     const viewport = document.getElementById('viewport');
     const worldContainer = document.getElementById('world-container');
-    const gridOverlay = document.getElementById('grid-overlay');
     const drawingsSvg = document.getElementById('drawings-svg');
     const atmosphereOverlay = document.getElementById('atmosphere-overlay');
     const sceneListEl = document.getElementById('scene-list');
@@ -230,7 +222,6 @@ try {
     const volSlider = document.getElementById('layer-volume');
     const calibSquare = document.getElementById('calibration-square');
     
-    // VARIABILI RIPRISTINATE
     const rotDisplay = document.getElementById('rot-display');
     const volDisplay = document.getElementById('vol-display');
 
@@ -289,34 +280,12 @@ try {
         }
     }
 
-    function applySceneGrid(scene) {
-        const active = scene.gridActive || false;
-        const size = scene.gridSize || 50;
-        const color = scene.gridColor || 'white';
-        
-        document.getElementById('grid-size').value = size;
-        const btnToggle = document.getElementById('toggle-grid');
-        const btnColor = document.getElementById('color-grid');
-        
-        btnToggle.innerText = active ? "Disattiva Griglia" : "Attiva Griglia";
-        btnToggle.style.background = active ? "#d9534f" : "#555";
-        
-        btnColor.innerText = color === 'white' ? "Colore: Bianco" : "Colore: Nero";
-        btnColor.style.background = color === 'white' ? "#fff" : "#000";
-        btnColor.style.color = color === 'white' ? "#000" : "#fff";
-
-        if(active) {
-            gridOverlay.style.display = 'block';
-            const rgba = color === 'white' ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.6)';
-            gridOverlay.style.backgroundImage = `linear-gradient(to right, ${rgba} 1px, transparent 1px), linear-gradient(to bottom, ${rgba} 1px, transparent 1px)`;
-            gridOverlay.style.backgroundSize = `${size}px ${size}px`;
-        } else {
-            gridOverlay.style.display = 'none';
-        }
-    }
-
     function renderDrawings() {
-        drawingsSvg.innerHTML = '';
+        // Metodo sicuro per pulire gli SVG in tutti i browser
+        while (drawingsSvg.firstChild) {
+            drawingsSvg.removeChild(drawingsSvg.firstChild);
+        }
+        
         const scene = scenes.find(s => s.id === currentSceneId);
         if(!scene || !scene.drawings) return;
         
@@ -348,7 +317,7 @@ try {
         const newScene = { 
             id: sceneCounter, name: `Scena ${sceneCounter}`, layers: [], 
             panX: 0, panY: 0, scale: 1, cameraLocked: false,
-            filter: 'none', gridActive: false, gridSize: 50, gridColor: 'white', drawings: []
+            filter: 'none', drawings: []
         };
         scenes.push(newScene);
         switchScene(newScene.id);
@@ -362,7 +331,7 @@ try {
         renderSceneList();
         
         Array.from(worldContainer.children).forEach(c => {
-            if(c.id !== 'grid-overlay' && c.id !== 'drawings-svg' && !c.classList.contains('ping-marker')) c.remove();
+            if(c.id !== 'drawings-svg' && !c.classList.contains('ping-marker')) c.remove();
         });
         
         scene.layers.forEach(layer => { 
@@ -374,7 +343,6 @@ try {
         applyWorldTransform(scene.panX, scene.panY, scene.scale);
         updateCameraLockUI(scene);
         applySceneAtmosphere(scene);
-        applySceneGrid(scene);
         renderDrawings();
         renderLayers();
     }
@@ -496,21 +464,6 @@ try {
         if(scene) { scene.filter = e.target.value; applySceneAtmosphere(scene); }
     };
     
-    document.getElementById('toggle-grid').onclick = () => {
-        const scene = scenes.find(s => s.id === currentSceneId);
-        if(scene) { scene.gridActive = !scene.gridActive; applySceneGrid(scene); }
-    };
-    
-    document.getElementById('color-grid').onclick = () => {
-        const scene = scenes.find(s => s.id === currentSceneId);
-        if(scene) { scene.gridColor = scene.gridColor === 'white' ? 'black' : 'white'; applySceneGrid(scene); }
-    };
-    
-    document.getElementById('grid-size').oninput = (e) => {
-        const scene = scenes.find(s => s.id === currentSceneId);
-        if(scene) { scene.gridSize = parseInt(e.target.value); applySceneGrid(scene); }
-    };
-
     document.getElementById('clear-drawings').onclick = () => {
         const scene = scenes.find(s => s.id === currentSceneId);
         if(scene) { scene.drawings = []; renderDrawings(); }
@@ -595,7 +548,7 @@ try {
         }
     });
 
-    document.getElementById('layer-rotation').addEventListener('input', (e) => {
+    rotSlider.addEventListener('input', (e) => {
         const scene = scenes.find(s => s.id === currentSceneId);
         const layer = scene?.layers.find(l => l.id === activeLayerId);
         if(layer) {
@@ -649,7 +602,7 @@ try {
         if (!customFileName) return; 
 
         loadingOverlay.style.display = 'flex';
-        document.getElementById('loading-text').innerText = "Salvataggio super-veloce in corso...";
+        document.getElementById('loading-text').innerText = "Salvataggio in corso...";
         
         setTimeout(() => {
             try {
@@ -657,7 +610,7 @@ try {
                     sceneCounter: sceneCounter, layerCounter: layerCounter,
                     scenes: scenes.map(scene => ({
                         id: scene.id, name: scene.name, panX: scene.panX, panY: scene.panY, scale: scene.scale, cameraLocked: scene.cameraLocked || false,
-                        filter: scene.filter, gridActive: scene.gridActive, gridSize: scene.gridSize, gridColor: scene.gridColor, drawings: scene.drawings || [],
+                        filter: scene.filter, drawings: scene.drawings || [],
                         layers: scene.layers.map(layer => ({
                             id: layer.id, name: layer.name, fileName: layer.fileName || "Media",
                             imgSrc: layer.imgSrc, ytId: layer.ytId || null, nWidth: layer.nWidth, nHeight: layer.nHeight, fogRatio: layer.fogRatio,
@@ -681,7 +634,7 @@ try {
     document.getElementById('upload-project').addEventListener('change', (e) => {
         const file = e.target.files[0];
         if (!file) return;
-        loadingOverlay.style.display = 'flex'; document.getElementById('loading-text').innerText = "Caricamento istantaneo mappa e nebbia...";
+        loadingOverlay.style.display = 'flex'; document.getElementById('loading-text').innerText = "Caricamento istantaneo mappa...";
         
         const reader = new FileReader();
         reader.onload = async (event) => {
@@ -698,8 +651,7 @@ try {
                 for (const sceneData of data.scenes) {
                     const newScene = {
                         id: sceneData.id, name: sceneData.name, panX: sceneData.panX, panY: sceneData.panY, scale: sceneData.scale, cameraLocked: sceneData.cameraLocked || false,
-                        filter: sceneData.filter || 'none', gridActive: sceneData.gridActive || false, gridSize: sceneData.gridSize || 50, gridColor: sceneData.gridColor || 'white',
-                        drawings: sceneData.drawings || [], layers: []
+                        filter: sceneData.filter || 'none', drawings: sceneData.drawings || [], layers: []
                     };
 
                     for (const layerData of sceneData.layers) {
@@ -747,8 +699,8 @@ try {
         layerListEl.innerHTML = '';
         
         if (!scene) {
-            rotDisplay.innerText = "0"; rotSlider.value = 0;
-            volDisplay.innerText = "0"; volSlider.value = 0; volSlider.disabled = true; return;
+            rotSlider.value = 0; rotDisplay.innerText = "0";
+            volSlider.value = 0; volDisplay.innerText = "0"; volSlider.disabled = true; return;
         }
 
         if (activeLayerId) {
@@ -975,10 +927,16 @@ try {
         } else if (currentMode.startsWith('hl-') && currentPath) {
             const wPos = getWorldCoords(pos.x, pos.y, scene);
             currentPath.points.push(wPos);
-            const polylines = drawingsSvg.querySelectorAll('polyline');
-            if (polylines.length > 0) {
-                const lastPoly = polylines[polylines.length - 1];
-                lastPoly.setAttribute("points", currentPath.points.map(p => `${p.x},${p.y}`).join(" "));
+            if (!pendingDraw) {
+                pendingDraw = true;
+                requestAnimationFrame(() => {
+                    const polylines = drawingsSvg.querySelectorAll('polyline');
+                    if (polylines.length > 0) {
+                        const lastPoly = polylines[polylines.length - 1];
+                        lastPoly.setAttribute("points", currentPath.points.map(p => `${p.x},${p.y}`).join(" "));
+                    }
+                    pendingDraw = false;
+                });
             }
         } else if ((currentMode === 'draw' || currentMode === 'erase') && activeLayer) {
             const localPos = getLayerLocalCoords(pos.x, pos.y, scene, activeLayer);
