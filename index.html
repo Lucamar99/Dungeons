@@ -3,10 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>D&D Tavolo Proiettore - V25 Clean YT</title>
-    
-    <script src="https://www.youtube.com/iframe_api"></script>
-
+    <title>D&D Tavolo Proiettore - V20 Director's Cut</title>
     <style>
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #050505; font-family: sans-serif; touch-action: none; color: #eee; }
         
@@ -17,24 +14,358 @@
         .layer-img { width: 100%; height: 100%; object-fit: fill; display: block; pointer-events: none; border: none; }
         .fog-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
         
-        #calibration-square { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); border: 4px solid #ff3333; background: rgba(255, 51, 51, 0.3); z-index: 100; pointer-events: none; width: 50px; height: 50px; display: none; }
+        /* Griglia, Disegni e Ping */
+        #grid-overlay { position: absolute; top: -5000px; left: -5000px; width: 10000px; height: 10000px; pointer-events: none; z-index: 400; display: none; }
+        #drawings-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; z-index: 500; }
         
-        #ui-panel { position: absolute; top: 10px; left: 10px; z-index: 60; background: rgba(20,20,20,0.95); padding: 12px; border-radius: 8px; border: 1px solid #444; width: 340px; max-height: 90vh; overflow-y: auto; box-shadow: 0 5px 15px rgba(0,0,0,0.9); transition: opacity 0.2s; }
+        @keyframes ping-anim {
+            0% { transform: scale(0); opacity: 1; border-width: 10px; }
+            100% { transform: scale(4); opacity: 0; border-width: 1px; }
+        }
+        .ping-marker { position: absolute; width: 60px; height: 60px; background: radial-gradient(circle, rgba(255,50,50,0.6) 0%, transparent 70%); border: 3px solid red; border-radius: 50%; transform-origin: center; animation: ping-anim 1.5s ease-out; pointer-events: none; z-index: 9999; margin-left: -30px; margin-top: -30px; }
+
+        /* Filtri Atmosfera */
+        #atmosphere-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 900; transition: background 1.5s, mix-blend-mode 1.5s; }
+        @keyframes pulse-fire { 0% { background: rgba(255, 60, 0, 0.25); } 100% { background: rgba(200, 20, 0, 0.4); } }
+        .filter-night { background: rgba(0, 20, 60, 0.65); mix-blend-mode: multiply; }
+        .filter-fire { mix-blend-mode: color; animation: pulse-fire 2s infinite alternate; }
+        .filter-sepia { background: rgba(150, 100, 50, 0.35); mix-blend-mode: multiply; }
+
+        #calibration-square { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); border: 4px solid #ff3333; background: rgba(255, 51, 51, 0.3); z-index: 1000; pointer-events: none; width: 50px; height: 50px; display: none; }
         
-        h3 { margin: 0 0 8px 0; font-size: 13px; color: #fff; text-transform: uppercase; border-bottom: 1px solid #555; padding-bottom: 4px; }
+        /* UI Panel e Accordion */
+        #ui-panel { position: absolute; top: 10px; left: 10px; z-index: 950; background: rgba(20,20,20,0.95); padding: 12px; border-radius: 8px; border: 1px solid #444; width: 330px; max-height: 90vh; overflow-y: auto; box-shadow: 0 5px 15px rgba(0,0,0,0.9); transition: opacity 0.2s; }
+        
+        .acc-btn { width: 100%; text-align: left; background: #2b2b2b; color: #fff; padding: 10px; font-size: 13px; text-transform: uppercase; font-weight: bold; border: 1px solid #444; border-radius: 4px; margin-bottom: 5px; cursor: pointer; transition: 0.2s; }
+        .acc-btn:hover { background: #3b3b3b; }
+        .acc-btn.active { background: #0056b3; border-color: #007bff; border-bottom-left-radius: 0; border-bottom-right-radius: 0; margin-bottom: 0; }
+        .acc-content { display: none; background: #1a1a1a; border: 1px solid #444; border-top: none; padding: 10px; border-bottom-left-radius: 4px; border-bottom-right-radius: 4px; margin-bottom: 5px; }
+        
         label { font-size: 11px; font-weight: bold; color: #aaa; display: block; margin: 8px 0 3px 0; text-transform: uppercase; }
-        input[type="file"], input[type="range"] { width: 100%; margin-bottom: 8px; }
+        input[type="file"], input[type="range"], select { width: 100%; margin-bottom: 8px; }
         input[type="file"] { font-size: 12px; color: #ccc; }
+        select { background: #333; color: white; border: 1px solid #555; padding: 5px; border-radius: 4px; }
         
         button { padding: 6px; font-size: 12px; border-radius: 4px; border: none; cursor: pointer; font-weight: bold; background: #444; color: white; transition: 0.1s; width: 100%; }
         button:active { transform: scale(0.95); }
         
         .row { display: flex; gap: 4px; margin-bottom: 8px; }
-        .row button { flex: 1; margin: 0; background: #333; border: 1px solid #222; }
+        .row button { flex: 1; margin: 0; background: #333; border: 1px solid #222; display: flex; align-items: center; justify-content: center;}
         .row button.active { background: #007bff; border-color: #66b0ff; box-shadow: inset 0 0 5px rgba(0,0,0,0.5); }
+        
+        /* Strumenti specifici */
+        .color-btn { width: 30px; height: 30px; border-radius: 50%; flex: none !important; border: 2px solid transparent !important; }
+        .color-btn.active { border-color: white !important; transform: scale(1.1); box-shadow: 0 0 8px currentColor; }
+        .bg-red { background-color: #ff3333 !important; color: #ff3333; }
+        .bg-green { background-color: #33ff33 !important; color: #33ff33; }
+        .bg-yellow { background-color: #ffff33 !important; color: #ffff33; }
         
         .list-container { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
         .item-row { display: flex; align-items: center; flex-wrap: wrap; background: #222; padding: 4px; border-radius: 4px; border: 1px solid #333; gap: 2px;}
+        .item-row.active { border-color: #5cb85c; background: #1a2a1a; }
+        .item-name { flex: 1; min-width: 100px; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; padding: 4px; }
+        .btn-icon { width: 26px; height: 26px; padding: 0; background: #333; font-size: 12px; display: flex; align-items: center; justify-content: center; margin-left: 2px; flex-shrink: 0;}
+        .btn-icon:hover { background: #555; }
+        .btn-icon.on { background: #f0ad4e; color: black; }
+        .btn-icon.danger { background: #d9534f; color: white; }
+        .btn-relink { width: 100%; background: #e67e22; color: #000; margin-top: 4px; padding: 4px; font-size: 11px;}
+        
+        #btn-fullscreen { background-color: #17a2b8; padding: 10px; font-size: 14px; margin-top: 5px; }
+        #hide-ui { background-color: #5cb85c; padding: 10px; font-size: 14px; margin-top: 5px; }
+        .hidden { display: none !important; opacity: 0; pointer-events: none; }
+        #reveal-ui { position: absolute; top: 10px; right: 10px; z-index: 1000; background: rgba(0,0,0,0.6); color: white; border-radius: 50%; width: 50px; height: 50px; font-size: 24px; border: 2px solid rgba(255,255,255,0.4); cursor: pointer; transition: opacity 0.2s; }
+        #loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2000; display: flex; justify-content: center; align-items: center; flex-direction: column; color: white; font-size: 20px; display: none; }
+        .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #5cb85c; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 15px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+<div id="loading-overlay"><div class="spinner"></div><div id="loading-text">Caricamento...</div></div>
+
+<div id="atmosphere-overlay"></div>
+
+<div id="ui-panel">
+    <div class="row" style="margin-bottom: 12px;">
+        <button id="btn-save-project" style="background: #e0a800; color: #000;">💾 Salva</button>
+        <button id="btn-load-trigger" style="background: #138496;">📂 Carica</button>
+        <input type="file" id="upload-project" accept=".json" class="hidden">
+    </div>
+
+    <div class="acc-btn active">🎬 Mappe e Livelli</div>
+    <div class="acc-content" style="display: block;">
+        <div class="list-container" id="scene-list"></div>
+        <button id="btn-new-scene" style="background: #0056b3; margin-bottom:10px;">+ Nuova Scena</button>
+        
+        <label>Aggiungi alla Scena:</label>
+        <div class="row">
+            <button id="btn-upload-trigger" style="background: #555;">📁 Img / Video</button>
+            <button id="btn-yt-layer" style="background: #cc0000;">🔴 YouTube</button>
+            <input type="file" id="upload-layer" accept="image/*,video/*" class="hidden">
+        </div>
+        <div class="list-container" id="layer-list" style="margin-top: 8px;"></div>
+    </div>
+
+    <div class="acc-btn">⚙️ Strumenti Master</div>
+    <div class="acc-content">
+        <label>Navigazione:</label>
+        <div class="row">
+            <button id="tool-camera" class="active">🌍 Camera</button>
+            <button id="tool-layer">✋ Sposta Layer</button>
+        </div>
+        <button id="btn-lock-camera" style="margin-bottom: 8px; background: #333;">🔓 Camera Sbloccata</button>
+        <div class="row">
+            <button id="btn-zoom-out">🔍 -</button>
+            <button id="btn-zoom-in">🔍 +</button>
+        </div>
+
+        <label>Nebbia di Guerra:</label>
+        <div class="row">
+            <button id="tool-draw">⬛ + Nebbia</button>
+            <button id="tool-erase">🧽 - Nebbia</button>
+        </div>
+        <div class="row">
+            <button id="clear-fog" style="background:#d9534f;">Pulisci</button>
+            <button id="fill-fog" style="background:#555;">Copri</button>
+        </div>
+
+        <label>Evidenziatore (Tratto Magico):</label>
+        <div class="row" style="justify-content: space-between;">
+            <button id="tool-hl-red" class="color-btn bg-red" title="Rosso"></button>
+            <button id="tool-hl-green" class="color-btn bg-green" title="Verde"></button>
+            <button id="tool-hl-yellow" class="color-btn bg-yellow" title="Giallo"></button>
+            <button id="clear-drawings" style="flex: 1; background: #d9534f; margin-left: 10px;">🗑️ Disegni</button>
+        </div>
+
+        <label>Spessore Nebbia / Evidenziatore:</label>
+        <input type="range" id="brush-size" min="10" max="300" value="80">
+
+        <label>Proprietà Layer Attivo:</label>
+        <div class="row" style="align-items: center; margin-bottom: 4px;">
+            <span style="font-size:10px; width:40px;">Rot:</span>
+            <input type="range" id="layer-rotation" min="0" max="360" value="0" style="margin-bottom: 0;">
+            <button id="btn-reset-rot" style="flex: 0 0 auto; width: 35px; margin-left: 5px; padding: 2px;">0°</button>
+        </div>
+        <div class="row" style="align-items: center; margin-bottom: 8px;">
+            <span style="font-size:10px; width:40px;">Vol:</span>
+            <input type="range" id="layer-volume" min="0" max="100" value="0" style="margin-bottom: 0;" disabled>
+        </div>
+    </div>
+
+    <div class="acc-btn">🌗 Atmosfera e Griglia</div>
+    <div class="acc-content">
+        <label>Filtro Globale:</label>
+        <select id="atmosphere-select">
+            <option value="none">☀️ Nessuno (Giorno)</option>
+            <option value="night">🌙 Notte Oscura</option>
+            <option value="fire">🔥 Incendio / Pericolo</option>
+            <option value="sepia">📜 Antico / Locanda</option>
+        </select>
+
+        <label>Griglia Tattica:</label>
+        <div class="row">
+            <button id="toggle-grid" style="background: #555;">Attiva Griglia</button>
+            <button id="color-grid" style="background: #fff; color: #000;">Colore: Bianco</button>
+        </div>
+        <label>Dimensione Griglia:</label>
+        <input type="range" id="grid-size" min="20" max="300" value="50">
+
+        <label>Calibrazione Proiettore:</label>
+        <button id="toggle-square" style="background: #d9831f; margin-bottom:5px;">Mostra Quadrato Rosso</button>
+        <input type="range" id="square-size" min="1" max="1000" value="50">
+    </div>
+
+    <button id="btn-fullscreen">🔲 Schermo Intero</button>
+    <button id="hide-ui">Nascondi Menù</button>
+    <div style="text-align: center; margin-top: 5px; font-size: 10px; color: #888;">(Doppio Tap per nascondere. Tieni premuto sulla mappa per il Ping!)</div>
+</div>
+
+<button id="reveal-ui" class="hidden">⚙️</button>
+<input type="file" id="upload-relink" accept="video/*" class="hidden">
+
+<div id="viewport">
+    <div id="world-container">
+        <div id="grid-overlay"></div>
+        <svg id="drawings-svg"></svg>
+    </div>
+    <div id="calibration-square"></div>
+</div>
+
+<script>
+window.addEventListener('DOMContentLoaded', () => {
+
+    // --- ACCORDION LOGIC ---
+    document.querySelectorAll('.acc-btn').forEach(btn => {
+        btn.onclick = () => {
+            // Chiudi tutti
+            document.querySelectorAll('.acc-btn').forEach(b => { b.classList.remove('active'); b.nextElementSibling.style.display = 'none'; });
+            // Apri cliccato
+            btn.classList.add('active');
+            btn.nextElementSibling.style.display = 'block';
+        };
+    });
+
+    // --- STATO ARCHITETTURA ---
+    let scenes = [];
+    let currentSceneId = null;
+    let activeLayerId = null; 
+    let sceneCounter = 0;
+    let layerCounter = 0;
+    const MAX_FOG_RES = 1500;
+    let layerToRelink = null;
+
+    const viewport = document.getElementById('viewport');
+    const worldContainer = document.getElementById('world-container');
+    const gridOverlay = document.getElementById('grid-overlay');
+    const drawingsSvg = document.getElementById('drawings-svg');
+    const atmosphereOverlay = document.getElementById('atmosphere-overlay');
+    const sceneListEl = document.getElementById('scene-list');
+    const layerListEl = document.getElementById('layer-list');
+    const loadingOverlay = document.getElementById('loading-overlay');
+    const btnLockCamera = document.getElementById('btn-lock-camera');
+    const volSlider = document.getElementById('layer-volume');
+
+    let currentMode = 'camera'; 
+    let isInteracting = false;
+    let startX = 0, startY = 0;
+    let lastPinchDist = null, lastPinchMid = null;
+    let pendingDraw = false;
+    let drawLastX = 0, drawLastY = 0, drawCurrX = 0, drawCurrY = 0;
+    let lastTapTime = 0;
+    let isCinemaMode = false;
+
+    // Ping & Drawing State
+    let pingTimer = null;
+    let currentPath = null;
+
+    function safeBase64ToBlobUrl(b64) {
+        if(!b64 || !b64.startsWith('data:')) return b64;
+        try {
+            const parts = b64.split(',');
+            const mime = parts[0].match(/:(.*?);/)[1];
+            const bstr = atob(parts[1]);
+            let n = bstr.length;
+            const u8arr = new Uint8Array(n);
+            while(n--){ u8arr[n] = bstr.charCodeAt(n); }
+            const blob = new Blob([u8arr], {type: mime});
+            return URL.createObjectURL(blob);
+        } catch(e) { return b64; }
+    }
+
+    function extractYouTubeID(url) {
+        const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+        const match = url.match(regExp);
+        return (match && match[2].length === 11) ? match[2] : null;
+    }
+
+    // --- MOTORE AUDIO, GRIGLIA, FILTRI E DISEGNI ---
+    function applyLayerVolume(layer) {
+        if (!layer || (!layer.isVideo && !layer.ytId)) return;
+        const vol = layer.volume || 0;
+        if (layer.isVideo && layer.mediaEl) {
+            layer.mediaEl.volume = vol / 100;
+            layer.mediaEl.muted = vol === 0;
+        } else if (layer.ytId && layer.mediaEl && layer.mediaEl.contentWindow) {
+            if (vol > 0) {
+                layer.mediaEl.contentWindow.postMessage(JSON.stringify({ "event": "command", "func": "unMute", "args": [] }), "*");
+                layer.mediaEl.contentWindow.postMessage(JSON.stringify({ "event": "command", "func": "setVolume", "args": [vol] }), "*");
+            } else {
+                layer.mediaEl.contentWindow.postMessage(JSON.stringify({ "event": "command", "func": "mute", "args": [] }), "*");
+            }
+        }
+    }
+
+    function applySceneAtmosphere(scene) {
+        atmosphereOverlay.className = '';
+        document.getElementById('atmosphere-select').value = scene.filter || 'none';
+        if(scene.filter && scene.filter !== 'none') {
+            atmosphereOverlay.classList.add(`filter-${scene.filter}`);
+        }
+    }
+
+    function applySceneGrid(scene) {
+        const active = scene.gridActive || false;
+        const size = scene.gridSize || 50;
+        const color = scene.gridColor || 'white';
+        
+        document.getElementById('grid-size').value = size;
+        const btnToggle = document.getElementById('toggle-grid');
+        const btnColor = document.getElementById('color-grid');
+        
+        btnToggle.innerText = active ? "Disattiva Griglia" : "Attiva Griglia";
+        btnToggle.style.background = active ? "#d9534f" : "#555";
+        
+        btnColor.innerText = color === 'white' ? "Colore: Bianco" : "Colore: Nero";
+        btnColor.style.background = color === 'white' ? "#fff" : "#000";
+        btnColor.style.color = color === 'white' ? "#000" : "#fff";
+
+        if(active) {
+            gridOverlay.style.display = 'block';
+            const rgba = color === 'white' ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.6)';
+            gridOverlay.style.backgroundImage = `linear-gradient(to right, ${rgba} 1px, transparent 1px), linear-gradient(to bottom, ${rgba} 1px, transparent 1px)`;
+            gridOverlay.style.backgroundSize = `${size}px ${size}px`;
+        } else {
+            gridOverlay.style.display = 'none';
+        }
+    }
+
+    function renderDrawings() {
+        drawingsSvg.innerHTML = '';
+        const scene = scenes.find(s => s.id === currentSceneId);
+        if(!scene || !scene.drawings) return;
+        
+        scene.drawings.forEach(path => {
+            const polyline = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+            polyline.setAttribute("fill", "none");
+            polyline.setAttribute("stroke", path.color);
+            polyline.setAttribute("stroke-width", path.width);
+            polyline.setAttribute("stroke-linecap", "round");
+            polyline.setAttribute("stroke-linejoin", "round");
+            polyline.setAttribute("opacity", "0.7");
+            const pointsStr = path.points.map(p => `${p.x},${p.y}`).join(" ");
+            polyline.setAttribute("points", pointsStr);
+            drawingsSvg.appendChild(polyline);
+        });
+    }
+
+    // Eventi Atmosfera e Griglia
+    document.getElementById('atmosphere-select').onchange = (e) => {
+        const scene = scenes.find(s => s.id === currentSceneId);
+        if(scene) { scene.filter = e.target.value; applySceneAtmosphere(scene); }
+    };
+    
+    document.getElementById('toggle-grid').onclick = () => {
+        const scene = scenes.find(s => s.id === currentSceneId);
+        if(scene) { scene.gridActive = !scene.gridActive; applySceneGrid(scene); }
+    };
+    
+    document.getElementById('color-grid').onclick = () => {
+        const scene = scenes.find(s => s.id === currentSceneId);
+        if(scene) { scene.gridColor = scene.gridColor === 'white' ? 'black' : 'white'; applySceneGrid(scene); }
+    };
+    
+    document.getElementById('grid-size').oninput = (e) => {
+        const scene = scenes.find(s => s.id === currentSceneId);
+        if(scene) { scene.gridSize = parseInt(e.target.value); applySceneGrid(scene); }
+    };
+
+    document.getElementById('clear-drawings').onclick = () => {
+        const scene = scenes.find(s => s.id === currentSceneId);
+        if(scene) { scene.drawings = []; renderDrawings(); }
+    };
+
+    // --- PING SYSTEM ---
+    function triggerPing(worldX, worldY) {
+        const ping = document.createElement('div');
+        ping.className = 'ping-marker';
+        ping.style.left = worldX + 'px';
+        ping.style.top = worldY + 'px';
+        worldContainer.appendChild(ping);
+        setTimeout(() => { if(ping.parentNode) ping.remove(); }, 1500);
+    }
+
+    // --- SCENE E LAYER ---
+    function createNewScene()         .item-row { display: flex; align-items: center; flex-wrap: wrap; background: #222; padding: 4px; border-radius: 4px; border: 1px solid #333; gap: 2px;}
         .item-row.active { border-color: #5cb85c; background: #1a2a1a; }
         
         .item-name { flex: 1; min-width: 80px; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; padding: 4px; }
