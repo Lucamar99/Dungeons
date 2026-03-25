@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>D&D Tavolo Proiettore - V26 Independent Weather</title>
+    <title>D&D Tavolo Proiettore - V27 Video Fix</title>
     <style>
         /* Regola globale per margini perfetti */
         *, *::before, *::after { box-sizing: border-box; }
@@ -289,7 +289,6 @@ try {
         }
     }
 
-    // Applica l'effetto esclusivamente al Layer specifico (NON globale)
     function applyLayerAtmosphere(layer) {
         if (!layer || !layer.atmosphereEl) return;
         layer.atmosphereEl.className = 'layer-atmosphere'; 
@@ -355,6 +354,11 @@ try {
             applyLayerVolume(layer);
             applyLayerAtmosphere(layer); 
             renderLayerDrawings(layer);
+
+            // FIX: Riattiva forzatamente i video locali quando si torna sulla scena
+            if (layer.isVideo && layer.mediaEl) {
+                layer.mediaEl.play().catch(err => console.log("Autoplay error:", err));
+            }
         });
         
         applyWorldTransform(scene.panX, scene.panY, scene.scale);
@@ -423,7 +427,6 @@ try {
                 mediaEl.className = 'layer-img'; 
                 wrapper.appendChild(mediaEl);
                 
-                // Meteo interno al wrapper del layer
                 const atmosphere = document.createElement('div');
                 atmosphere.className = 'layer-atmosphere';
                 wrapper.appendChild(atmosphere);
