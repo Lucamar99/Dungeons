@@ -212,6 +212,235 @@ window.addEventListener('DOMContentLoaded', () => {
     const MAX_FOG_RES = 1500;
     let layerToRelink = null;
 
+    // --- DOM ELEMENTS ---
+    const viewport = document.getElementById('viewport');
+    const worldContainer = document.getElementById('world-container');
+    const gridOverlay = document.getElementById('grid-overlay');
+    const drawingsSvg = document.getElementById('drawings-svg');
+    const atmosphereOverlay = document.getElementById('atmosphere-overlay');
+    const sceneListEl = document.getElementById('scene-list');
+    const layerListEl = document.getElementById('layer-list');
+    const loadingOverlay = document.getElementById('loading-overlay');
+    const btnLockCamera = document.getElementById('btn-lock-camera');
+    const calibSquare = document.getElementById('calibration-square');
+    
+    // Sliders & UI Elements
+    const rotSlider = document.getElementById('layer-rotation');
+    const volSlider = document.getElementById('layer-volume');
+    const rotDisplay = document.getElementById('rot-display');
+    const volDisplay = document.getElementById('vol-display');
+    const uiPanel = document.getElementById('ui-panel');
+    const revealUiBtn = document.getElementById('reveal-ui');
+
+    let currentMode = 'camera'; 
+    let isInteracting = false;
+    let startX = 0, startY = 0;
+    let lastPinchDist = null, lastPinchMid = null;
+    let pendingDraw = false;
+    let drawLastX = 0, drawLastY = 0, drawCurrX = 0, drawCurrY = 0;
+    let lastTapTime = 0;
+    let isCinemaMode = false;
+    let pingTimer = null;
+    let currentPath = null;
+
+    function safeBase64ToBlobUrl(b64) {
+        if(!b64 || !b64.startsWith('data:')) return b64;
+        try {
+            const parts = b64.split(',');
+            const mime = parts[0].match(/:(.*?);/)[1];
+            const bstr = atob(parts[1]);
+            let n = bstr.length;
+            const u8arr = new Uint8Array(n);
+            while(n--){ u8arr[n] = bstr.charCodeAt(n); }
+            const blob = new Blob([u8arr], {type: mime});
+            return URL.createObjectURL(blob);
+        } catch(e) { return b64; }
+    }
+
+    function extractYouTubeID(url) {
+        const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+        const match = url.match(regExp);
+        return (match && match[2].length === 11) ? match[2] : null;
+    }
+
+    function applyLayerVolume(layer) {
+        if (!layer || (!layer.isVideo && !layer.ytId)) return;
+        const vol = layer.volume || 0;
+        if (layer.isVideo && layer.mediaEl) {
+            layer.mediaEl.volume = vol / 100;
+            layer.mediaEl.muted = vol === 0;
+        } else if (layer.ytId && layer.mediaEl && layer.mediaEl.contentWindow) {
+            if (vol > 0) {
+                layer.mediaEl.contentWindow.postMessage(JSON.stringify({ "event": "command", "func": "unMute", "args": [] }), "*");
+                layer.mediaEl.contentWindow.postMessage(JSON.stringify({ "event": "command", "func": "setVolume", "args": [vol] }), "*");
+            } else {
+                layer.mediaEl.contentWindow.postMessage(JSON.stringify({ "event": "command", "func": "mute", "args": [] }), "*");
+            }
+        }
+    }
+
+    function applySceneAtmosphere(scene) {
+        if (!scene) return;
+        atmosphereOverlay.className = '';
+        document.getElementById('atmosphere-select').value = scene.filter || 'none';
+        if(scene.filter && scene.filter !== 'none') {
+            atmosphereOverlay.classList.add(`filter-${scene.filter}`);
+        }
+    }
+
+    function applySceneGrid(scene) {
+        if (!scene) return;
+        const active = scene.gridActive || false;
+        const size = scene.gridSize || 50;
+        const color = scene.gridColor || 'white';
+        
+        document.getElementById('grid-size').value = size;
+        const btnToggle = document.getElementById('toggle-grid');
+        const btnColor = document.getElementById('color-grid');
+        
+        btnToggle.innerText = active ? "Disattiva Griglia" : "Attiva Griglia";
+        btnToggle.style.background = active ? "#d9534f" : "#555";
+        
+        btnColor.innerText = color === 'white' ? "Colore: Bianco" : "Colore: Nero";
+        btnColor.style.background = color === 'white' ? "#fff" : "#000";
+        btnColor.style.color = color === 'white' ? "#000" : "#fff";
+
+        if(active) {
+            gridOverlay.style.display = 'block';
+            const rgba = color === 'white' ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.6)';
+            gridOverlay.style.backgroundImage = `linear-gradient(to right, ${rgba} 1px, transparent 1px), linear-gradient(to bottom, ${rgba} 1px, transparent 1px)`;
+            gridOverlay.style.backgroundSize = `${size}px ${size}px`;
+        } else {
+            gridOverlay.style.display = 'none';
+        }
+    }
+
+    function renderDrawings() {
+        drawingsSvg.innerHTML = '';
+        const scene = scenes.find(s => s.id === currentSceneId);
+        if(!scene || !scene.drawings) return;
+        
+        scene.drawings.forEach(path => {
+            const polyline = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+            polyline.setAttribute("fill", "none");
+            polyline.setAttribute("stroke", path.color);
+            polyline.setAttribute("stroke-width", path.width);
+            polyline.setAttribute("stroke-linecap", "round");
+            polyline.setAttribute("stroke-linejoin", "round");
+            polyline.setAttribute("opacity", "0.7");
+            const pointsStr = path.points.map(p => `${p.x},${p.y}`).join(" ");
+            polyline.setAttribute("points", pointsStr);
+            drawingsSvg.appendChild(polyline);
+        });
+    }
+
+    function triggerPing(worldX, worldY) {
+        const ping = document.createElement('div');
+        ping.className = 'ping-marker';
+        ping.style.left = worldX + 'px';
+        ping.style.top = worldY + 'px';
+        worldContainer.appendChild(ping);
+        setTimeout(() => { if(ping.parentNode) ping.remove(); }, 1500);
+    }
+
+    function createNewScene() {
+        sceneCounter++;
+        const newScene = { 
+            id: sceneCounter, name: `Scena ${sceneCounter}`, layers: [], 
+            panX: 0, panY: 0, scale: 1, cameraLocked: false,
+            filter: 'none', gridActive: false, gridSize: 50, gridColor: 'white', drawings: []
+        };
+        scenes.push(newScene);
+        switchScene(newScene.id);
+        renderSceneList();
+    }
+
+    function switchScene(id) {
+        currentSceneId = id; activeLayerId = null; updateToolUI('camera');
+        const scene = scenes.find(s => s.id === id);
+        if (!scene) return;
+        
+        renderSceneList();
+        
+        Array.from(worldContainer.children).forEach(c => {
+            if(c.id !== 'grid-overlay' && c.id !== 'drawings-svg' && !c.classList.contains('ping-markerleft: 10px;">🗑️ Disegni</button>
+        </div>
+
+        <label>Spessore Nebbia / Evidenziatore:</label>
+        <input type="range" id="brush-size" min="10" max="300" value="80">
+
+        <label>Proprietà Layer Attivo:</label>
+        <div class="row" style="align-items: center; margin-bottom: 4px;">
+            <span style="font-size:10px; width:50px;">Rot: <span id="rot-display">0</span>°</span>
+            <input type="range" id="layer-rotation" min="0" max="360" value="0" style="margin-bottom: 0;">
+            <button id="btn-reset-rot" style="flex: 0 0 auto; width: 35px; margin-left: 5px; padding: 2px;">0°</button>
+        </div>
+        <div class="row" style="align-items: center; margin-bottom: 8px;">
+            <span style="font-size:10px; width:50px;">Vol: <span id="vol-display">0</span>%</span>
+            <input type="range" id="layer-volume" min="0" max="100" value="0" style="margin-bottom: 0;" disabled>
+        </div>
+    </div>
+
+    <div class="acc-btn">🌗 Atmosfera e Griglia</div>
+    <div class="acc-content">
+        <label>Filtro Globale:</label>
+        <select id="atmosphere-select">
+            <option value="none">☀️ Nessuno (Giorno)</option>
+            <option value="night">🌙 Notte Oscura</option>
+            <option value="fire">🔥 Incendio / Pericolo</option>
+            <option value="sepia">📜 Antico / Locanda</option>
+        </select>
+
+        <label>Griglia Tattica:</label>
+        <div class="row">
+            <button id="toggle-grid" style="background: #555;">Attiva Griglia</button>
+            <button id="color-grid" style="background: #fff; color: #000;">Colore: Bianco</button>
+        </div>
+        <label>Dimensione Griglia:</label>
+        <input type="range" id="grid-size" min="20" max="300" value="50">
+
+        <label>Calibrazione Proiettore:</label>
+        <button id="toggle-square" style="background: #d9831f; margin-bottom:5px;">Mostra Quadrato Rosso</button>
+        <input type="range" id="square-size" min="1" max="1000" value="50">
+    </div>
+
+    <button id="btn-fullscreen">🔲 Schermo Intero</button>
+    <button id="hide-ui">Nascondi Menù</button>
+    <div style="text-align: center; margin-top: 5px; font-size: 10px; color: #888;">(Doppio Tap per nascondere. Tieni premuto sulla mappa per il Ping!)</div>
+</div>
+
+<button id="reveal-ui" class="hidden">⚙️</button>
+<input type="file" id="upload-relink" accept="video/*" class="hidden">
+
+<div id="viewport">
+    <div id="world-container">
+        <div id="grid-overlay"></div>
+        <svg id="drawings-svg"></svg>
+    </div>
+    <div id="calibration-square"></div>
+</div>
+
+<script>
+window.addEventListener('DOMContentLoaded', () => {
+
+    // --- ACCORDION LOGIC ---
+    document.querySelectorAll('.acc-btn').forEach(btn => {
+        btn.onclick = () => {
+            document.querySelectorAll('.acc-btn').forEach(b => { b.classList.remove('active'); b.nextElementSibling.style.display = 'none'; });
+            btn.classList.add('active');
+            btn.nextElementSibling.style.display = 'block';
+        };
+    });
+
+    // --- VARIABILI GLOBALI ---
+    let scenes = [];
+    let currentSceneId = null;
+    let activeLayerId = null; 
+    let sceneCounter = 0;
+    let layerCounter = 0;
+    const MAX_FOG_RES = 1500;
+    let layerToRelink = null;
+
     const viewport = document.getElementById('viewport');
     const worldContainer = document.getElementById('world-container');
     const gridOverlay = document.getElementById('grid-overlay');
