@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>D&D Tavolo Proiettore - Final Fullscreen Fix</title>
+    <title>D&D Tavolo Proiettore - V35 Layout Fix</title>
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
     <style>
         /* --- RESET E BASE --- */
@@ -76,13 +76,16 @@
             position: absolute; top: 20px; right: 20px;
             width: 340px; border-radius: 20px; padding: 16px;
             display: flex; flex-direction: column; gap: 10px;
-            max-height: calc(100vh - 40px); overflow-y: auto; touch-action: pan-y;
+            max-height: calc(100vh - 40px); 
+            overflow-y: auto; 
+            touch-action: pan-y;
+            overscroll-behavior: contain; /* Evita lo scroll della pagina sottostante */
         }
         #right-panel::-webkit-scrollbar { width: 6px; }
         #right-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.25); border-radius: 10px; }
 
         /* ACCORDIONS */
-        .acc-group { display: flex; flex-direction: column; width: 100%; border-radius: 12px; overflow: hidden; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); }
+        .acc-group { display: flex; flex-direction: column; width: 100%; border-radius: 12px; overflow: hidden; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); flex-shrink: 0;}
         .acc-btn { 
             width: 100%; text-align: left; background: transparent; color: #fff; 
             padding: 14px; font-size: 13px; text-transform: uppercase; font-weight: 700; 
@@ -93,7 +96,7 @@
         .acc-btn.active { background: rgba(10, 132, 255, 0.15); border-bottom: 1px solid rgba(10, 132, 255, 0.3); }
         .acc-content { display: none; padding: 14px; }
 
-        .row { display: flex; gap: 8px; align-items: center; }
+        .row { display: flex; gap: 8px; align-items: center; flex-shrink: 0;}
         .row-btn { flex: 1; padding: 12px; border-radius: 10px; border: none; background: rgba(255,255,255,0.1); color: white; font-weight: 600; font-size: 13px; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; gap: 6px; }
         .row-btn:hover { background: rgba(255,255,255,0.2); }
         .btn-primary { background: #0a84ff; } .btn-primary:hover { background: #007aff; }
@@ -109,9 +112,17 @@
         .color-swatch:hover { transform: scale(1.1); }
         .color-swatch.active { border-color: white; transform: scale(1.2); box-shadow: 0 0 12px currentColor; }
 
-        /* CARDS (Scene e Layer) */
-        .list-container { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
-        .scene-item, .layer-item-container { display: flex; flex-direction: column; background: rgba(0,0,0,0.4); padding: 10px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05); gap: 10px; transition: 0.2s; cursor: pointer; }
+        /* CARDS (Scene e Layer) CON SCROLL INDIPENDENTE */
+        .list-container { 
+            display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; 
+            max-height: 35vh; /* Se ci sono troppi livelli, scrolla internamente! */
+            overflow-y: auto; overscroll-behavior: contain;
+            padding-right: 4px;
+        }
+        .list-container::-webkit-scrollbar { width: 4px; }
+        .list-container::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.25); border-radius: 4px; }
+
+        .scene-item, .layer-item-container { display: flex; flex-direction: column; background: rgba(0,0,0,0.4); padding: 10px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05); gap: 10px; transition: 0.2s; cursor: pointer; flex-shrink: 0; }
         .scene-item.active, .layer-item-container.active { border-color: rgba(10, 132, 255, 0.6); background: rgba(10, 132, 255, 0.15); box-shadow: 0 0 15px rgba(10, 132, 255, 0.1); }
         
         .layer-top-row { display: flex; justify-content: space-between; align-items: center; width: 100%; }
@@ -129,7 +140,7 @@
         
         #reveal-ui { position: absolute; top: 20px; right: 20px; z-index: 1000; background: rgba(25,30,35,0.8); backdrop-filter: blur(10px); color: white; border-radius: 50%; width: 60px; height: 60px; border: 1px solid rgba(255,255,255,0.2); cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 20px rgba(0,0,0,0.6);}
 
-        /* NUOVA MODAL CUSTOM (Sostituisce i prompt di sistema per non uscire dal fullscreen) */
+        /* NUOVA MODAL CUSTOM */
         #custom-modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 10000; display: none; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
         #custom-modal { display: flex; flex-direction: column; gap: 16px; width: 340px; padding: 24px; text-align: center; }
         #modal-text { font-size: 16px; font-weight: 600; color: white; }
@@ -151,7 +162,13 @@
             #left-toolbar { top: auto; bottom: 15px; left: 50%; transform: translateX(-50%); width: calc(100vw - 30px); flex-direction: row; overflow-x: auto; justify-content: flex-start; padding: 10px 14px; touch-action: pan-x; border-radius: 24px; }
             #left-toolbar::-webkit-scrollbar { display: none; }
             .toolbar-divider { width: 1px; height: 36px; margin: 0 6px; }
-            #right-panel { top: 15px; right: auto; left: 50%; transform: translateX(-50%); width: calc(100vw - 30px); max-height: calc(100vh - 110px); }
+            
+            #right-panel { 
+                top: 15px; right: auto; left: 50%; transform: translateX(-50%); 
+                width: calc(100vw - 30px); 
+                max-height: calc(100vh - 100px); /* Lascia spazio alla toolbar sotto */
+                padding-bottom: 24px; /* Imbottitura di sicurezza extra per fare scrollare l'ultimo elemento (Volume) in alto */
+            }
             #reveal-ui { top: 15px; right: 15px; }
         }
     </style>
@@ -202,8 +219,8 @@
     <div class="acc-group">
         <button class="acc-btn active"><span class="material-symbols-rounded">map</span> Mappe e Livelli</button>
         <div class="acc-content" style="display: block;">
-            <div class="list-container" id="scene-list" style="margin-bottom: 12px;"></div>
-            <button id="btn-new-scene" class="row-btn btn-primary" style="width: 100%; margin-bottom:15px;"><span class="material-symbols-rounded">add</span> Nuova Scena</button>
+            <div class="list-container" id="scene-list"></div>
+            <button id="btn-new-scene" class="row-btn btn-primary" style="width: 100%; margin-top: 4px; margin-bottom:15px;"><span class="material-symbols-rounded">add</span> Nuova Scena</button>
             
             <label>Aggiungi Livello alla Scena:</label>
             <div class="row" style="margin-bottom: 12px;">
@@ -281,7 +298,7 @@
 </div>
 
 <script>
-// --- LOGICA MODAL CUSTOM (Sostituisce alert/prompt/confirm di sistema) ---
+// --- LOGICA MODAL CUSTOM ---
 const customModalOverlay = document.getElementById('custom-modal-overlay');
 const modalText = document.getElementById('modal-text');
 const modalInput = document.getElementById('modal-input');
@@ -301,7 +318,6 @@ function showCustomModal(text, isPrompt = false, defaultValue = "", callback = n
     
     customModalOverlay.style.display = 'flex';
     
-    // Rimuovi vecchi listener
     modalOk.onclick = null;
     modalCancel.onclick = null;
     
@@ -316,7 +332,6 @@ function showCustomModal(text, isPrompt = false, defaultValue = "", callback = n
     };
 }
 
-// Premendo INVIO si conferma
 modalInput.addEventListener("keyup", function(event) {
     if (event.key === "Enter") {
         event.preventDefault();
@@ -435,27 +450,6 @@ try {
         }
     }
 
-    function renderLayerDrawings(layer) {
-        if (!layer || !layer.svg) return;
-        while (layer.svg.firstChild) {
-            layer.svg.removeChild(layer.svg.firstChild);
-        }
-        if (!layer.drawings) return;
-        
-        layer.drawings.forEach(path => {
-            const polyline = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
-            polyline.setAttribute("fill", "none");
-            polyline.setAttribute("stroke", path.color);
-            polyline.setAttribute("stroke-width", path.width);
-            polyline.setAttribute("stroke-linecap", "round");
-            polyline.setAttribute("stroke-linejoin", "round");
-            polyline.setAttribute("opacity", "0.7");
-            const pointsStr = path.points.map(p => `${p.x},${p.y}`).join(" ");
-            polyline.setAttribute("points", pointsStr);
-            layer.svg.appendChild(polyline);
-        });
-    }
-
     function triggerPing(worldX, worldY) {
         const ping = document.createElement('div');
         ping.className = 'ping-marker';
@@ -492,7 +486,6 @@ try {
             updateLayerTransform(layer); 
             applyLayerVolume(layer);
             applyLayerAtmosphere(layer); 
-            renderLayerDrawings(layer);
 
             if (layer.isVideo && layer.mediaEl) {
                 layer.mediaEl.play().catch(err => console.log("Autoplay error:", err));
@@ -658,7 +651,7 @@ try {
             layer.filter = e.target.value; 
             applyLayerAtmosphere(layer); 
         } else {
-            showToast("Seleziona prima un livello per applicare un filtro meteo.", "error");
+            showToast("Seleziona prima un livello.", "error");
             e.target.value = 'none';
         }
     };
@@ -676,7 +669,6 @@ try {
 
     document.getElementById('btn-upload-trigger').onclick = () => document.getElementById('upload-layer').click();
 
-    // Modificato YT con Custom Modal
     document.getElementById('btn-yt-layer').onclick = () => {
         showCustomModal("Incolla qui il link del video di YouTube:", true, "", async (url) => {
             if (!url) return;
@@ -792,7 +784,6 @@ try {
         e.target.value = '';
     });
 
-    // Modificato Save con Custom Modal
     document.getElementById('btn-save-project').onclick = () => {
         for (let s of scenes) {
             for (let l of s.layers) {
