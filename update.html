@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>D&D Tavolo Proiettore - V31 Ultimate UI</title>
+    <title>D&D Tavolo Proiettore - V32 Clean UI</title>
     <style>
         /* --- RESET E BASE --- */
         *, *::before, *::after { box-sizing: border-box; }
@@ -14,13 +14,11 @@
         #world-container { position: absolute; top: 0; left: 0; transform-origin: 0 0; will-change: transform; width: 0; height: 0; }
         .layer-wrapper { position: absolute; top: 0; left: 0; transform-origin: center; will-change: transform; overflow: hidden; }
         
-        /* Gerarchia Z-index interna al layer */
         .layer-img { width: 100%; height: 100%; object-fit: fill; display: block; pointer-events: none; border: none; z-index: 1; }
         .layer-atmosphere { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 2; transition: background 1.5s, mix-blend-mode 1.5s; }
         .fog-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 3; }
         .hl-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 4; opacity: 0.8; }
         
-        /* Ping Animato */
         @keyframes ping-anim { 0% { transform: scale(0); opacity: 1; border-width: 10px; } 100% { transform: scale(4); opacity: 0; border-width: 1px; } }
         .ping-marker { position: absolute; width: 60px; height: 60px; background: radial-gradient(circle, rgba(255,50,50,0.6) 0%, transparent 70%); border: 3px solid red; border-radius: 50%; transform-origin: center; animation: ping-anim 1.5s ease-out; pointer-events: none; z-index: 9999; margin-left: -30px; margin-top: -30px; }
 
@@ -41,7 +39,7 @@
 
         /* --- UI PREMIUM (GLASSMORPHISM) --- */
         .glass-panel {
-            background: rgba(25, 30, 35, 0.75);
+            background: rgba(25, 30, 35, 0.85);
             backdrop-filter: blur(16px);
             -webkit-backdrop-filter: blur(16px);
             border: 1px solid rgba(255, 255, 255, 0.1);
@@ -50,67 +48,58 @@
             transition: opacity 0.3s ease;
         }
 
-        /* TOOLBAR SINISTRA (Desktop) */
+        /* TOOLBAR SINISTRA */
         #left-toolbar {
             position: absolute; top: 20px; left: 20px;
             width: 64px; padding: 8px 0; border-radius: 16px;
             display: flex; flex-direction: column; align-items: center; gap: 10px;
             touch-action: pan-y;
         }
-        
         .toolbar-divider { width: 40px; height: 1px; background: rgba(255,255,255,0.15); margin: 4px 0; flex-shrink: 0; }
-
-        .tool-btn {
-            width: 44px; height: 44px; border-radius: 12px; border: none; cursor: pointer;
-            background: rgba(255,255,255,0.05); color: white; font-size: 20px; flex-shrink: 0;
-            display: flex; align-items: center; justify-content: center;
-            transition: all 0.2s ease; outline: 2px solid transparent;
-        }
+        .tool-btn { width: 44px; height: 44px; border-radius: 12px; border: none; cursor: pointer; background: rgba(255,255,255,0.05); color: white; font-size: 20px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease; outline: 2px solid transparent; }
         .tool-btn:hover { background: rgba(255,255,255,0.15); transform: translateY(-2px); }
         .tool-btn:active { transform: translateY(0); }
         .tool-btn.active { background: #007aff; box-shadow: 0 0 15px rgba(0, 122, 255, 0.5); outline: 2px solid #66b0ff; }
 
-        /* PANNELLO DESTRA (Desktop) */
+        /* PANNELLO DESTRA COMPATTO */
         #right-panel {
             position: absolute; top: 20px; right: 20px;
-            width: 320px; max-height: calc(100vh - 40px);
-            border-radius: 16px; padding: 16px;
-            display: flex; flex-direction: column; gap: 12px;
-            overflow-y: auto; touch-action: pan-y;
+            width: 320px; border-radius: 16px; padding: 12px;
+            display: flex; flex-direction: column; gap: 8px;
+            max-height: calc(100vh - 40px); overflow-y: auto;
         }
         #right-panel::-webkit-scrollbar { width: 6px; }
         #right-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 10px; }
 
-        .panel-section { background: rgba(0,0,0,0.3); border-radius: 12px; padding: 12px; border: 1px solid rgba(255,255,255,0.05); flex-shrink: 0; }
-        .section-title { font-size: 11px; font-weight: 700; color: #8e8e93; text-transform: uppercase; margin-bottom: 10px; letter-spacing: 0.5px; }
+        /* ACCORDIONS RIPRISTINATI */
+        .acc-btn { width: 100%; text-align: left; background: rgba(255,255,255,0.08); color: #fff; padding: 12px; font-size: 12px; text-transform: uppercase; font-weight: bold; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; cursor: pointer; transition: 0.2s; letter-spacing: 0.5px; }
+        .acc-btn:hover { background: rgba(255,255,255,0.15); }
+        .acc-btn.active { background: #007aff; border-color: #66b0ff; border-bottom-left-radius: 0; border-bottom-right-radius: 0; box-shadow: inset 0 0 10px rgba(0,0,0,0.2); }
+        .acc-content { display: none; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-top: none; padding: 12px; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; margin-bottom: 4px; }
 
         .row { display: flex; gap: 8px; align-items: center; }
         .row-btn { flex: 1; padding: 10px; border-radius: 8px; border: none; background: rgba(255,255,255,0.1); color: white; font-weight: 600; font-size: 13px; cursor: pointer; transition: 0.2s; }
         .row-btn:hover { background: rgba(255,255,255,0.2); }
         .btn-primary { background: #007aff; } .btn-primary:hover { background: #0066d6; }
-        .btn-success { background: #34c759; } .btn-success:hover { background: #2eb050; }
         .btn-warning { background: #ff9500; color: black; } .btn-warning:hover { background: #e08300; }
         .btn-danger { background: #ff3b30; } .btn-danger:hover { background: #d63026; }
 
-        label { font-size: 12px; color: #ccc; display: block; margin-bottom: 4px; }
-        input[type="range"] { width: 100%; margin: 5px 0 15px 0; accent-color: #007aff; }
-        select { width: 100%; background: rgba(0,0,0,0.5); color: white; border: 1px solid rgba(255,255,255,0.2); padding: 8px; border-radius: 8px; font-size: 13px; margin-bottom: 10px; outline: none; }
+        label { font-size: 11px; color: #aaa; display: block; margin: 8px 0 4px 0; font-weight: 600; text-transform: uppercase;}
+        input[type="range"] { width: 100%; margin: 5px 0 10px 0; accent-color: #007aff; }
+        select { width: 100%; background: rgba(0,0,0,0.5); color: white; border: 1px solid rgba(255,255,255,0.2); padding: 8px; border-radius: 8px; font-size: 13px; outline: none; }
 
-        /* Palette Colori Evidenziatore */
+        /* Palette Evidenziatore */
         .color-swatch { width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; transition: 0.2s; flex-shrink: 0; }
         .color-swatch:hover { transform: scale(1.1); }
         .color-swatch.active { border-color: white; transform: scale(1.15); box-shadow: 0 0 10px currentColor; }
 
-        /* Blocchi Layer Ridisegnati (2 Righe) */
-        .list-container { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
-        .layer-item-container { display: flex; flex-direction: column; background: rgba(0,0,0,0.4); padding: 8px; border-radius: 8px; border: 1px solid transparent; gap: 8px; transition: 0.2s; cursor: pointer; }
+        /* Blocchi Layer */
+        .list-container { display: flex; flex-direction: column; gap: 6px; }
+        .layer-item-container { display: flex; flex-direction: column; background: rgba(0,0,0,0.5); padding: 8px; border-radius: 8px; border: 1px solid transparent; gap: 8px; transition: 0.2s; cursor: pointer; }
         .layer-item-container.active { border-color: #34c759; background: rgba(52, 199, 89, 0.15); }
-        
         .layer-top-row { display: flex; justify-content: space-between; align-items: center; width: 100%; }
         .layer-bottom-row { display: flex; justify-content: flex-start; align-items: center; width: 100%; gap: 6px; }
-        
-        .layer-name-wrap { flex: 1; font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 10px;}
-        
+        .layer-name-wrap { flex: 1; font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 10px;}
         .mini-btn { width: 28px; height: 28px; border-radius: 6px; border: none; background: rgba(255,255,255,0.1); color: white; font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
         .mini-btn:hover { background: rgba(255,255,255,0.25); }
         .mini-btn.danger { color: #ff3b30; }
@@ -129,20 +118,12 @@
         #loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(5px); z-index: 2000; display: flex; justify-content: center; align-items: center; flex-direction: column; color: white; font-size: 18px; font-weight: bold; letter-spacing: 1px; display: none; }
         .spinner { border: 4px solid rgba(255,255,255,0.1); border-top: 4px solid #007aff; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin-bottom: 20px; }
 
-        /* --- ADATTAMENTO MOBILE --- */
+        /* ADATTAMENTO MOBILE */
         @media (max-width: 768px) {
-            #left-toolbar {
-                top: auto; bottom: 15px; left: 50%; transform: translateX(-50%);
-                width: calc(100vw - 30px); flex-direction: row; overflow-x: auto;
-                justify-content: flex-start; padding: 8px 12px; touch-action: pan-x;
-            }
+            #left-toolbar { top: auto; bottom: 15px; left: 50%; transform: translateX(-50%); width: calc(100vw - 30px); flex-direction: row; overflow-x: auto; justify-content: flex-start; padding: 8px 12px; touch-action: pan-x; }
             #left-toolbar::-webkit-scrollbar { display: none; }
             .toolbar-divider { width: 1px; height: 30px; margin: 0 4px; }
-            
-            #right-panel {
-                top: 15px; right: auto; left: 50%; transform: translateX(-50%);
-                width: calc(100vw - 30px); max-height: calc(100vh - 110px);
-            }
+            #right-panel { top: 15px; right: auto; left: 50%; transform: translateX(-50%); width: calc(100vw - 30px); max-height: calc(100vh - 110px); }
             .tool-btn { min-width: 44px; }
             #reveal-ui { top: 15px; right: 15px; }
         }
@@ -155,50 +136,49 @@
 <div id="atmosphere-overlay"></div>
 
 <div id="left-toolbar" class="glass-panel">
-    <button id="tool-camera" class="tool-btn active" title="Sposta Camera (Mappa)">🗺️</button>
-    <button id="tool-layer" class="tool-btn" title="Sposta Livello Selezionato">🎯</button>
-    <button id="btn-lock-camera" class="tool-btn" title="Blocca/Sblocca Camera">🔓</button>
+    <button id="tool-camera" class="tool-btn active" title="Sposta Camera">🗺️</button>
+    <button id="tool-layer" class="tool-btn" title="Sposta Livello">🎯</button>
+    <button id="btn-lock-camera" class="tool-btn" title="Blocca Camera">🔓</button>
     
     <div class="toolbar-divider"></div>
     
     <button id="tool-draw" class="tool-btn" title="Aggiungi Nebbia">☁️</button>
-    <button id="tool-erase" class="tool-btn" title="Cancella Nebbia (Torcia)">🧽</button>
-    <button id="fill-fog" class="tool-btn" title="Copri tutta la mappa">🌫️</button>
-    <button id="clear-fog" class="tool-btn" title="Pulisci tutta la nebbia">🧹</button>
+    <button id="tool-erase" class="tool-btn" title="Cancella Nebbia">🧽</button>
+    <button id="fill-fog" class="tool-btn" title="Copri tutto">🌫️</button>
+    <button id="clear-fog" class="tool-btn" title="Pulisci tutto">🧹</button>
     
     <div class="toolbar-divider"></div>
     
-    <button id="tool-hl-draw" class="tool-btn" title="Disegna Evidenziatore">🖍️</button>
+    <button id="tool-hl-draw" class="tool-btn" title="Evidenzia">🖍️</button>
     <button id="tool-hl-erase" class="tool-btn" title="Gomma Evidenziatore">🧽🖍️</button>
 </div>
 
 <div id="right-panel" class="glass-panel">
     
-    <div class="row">
+    <div class="row" style="margin-bottom: 4px;">
         <button id="btn-save-project" class="row-btn btn-warning">💾 Salva</button>
         <button id="btn-load-trigger" class="row-btn btn-primary">📂 Carica</button>
         <input type="file" id="upload-project" accept=".json" class="hidden">
     </div>
 
-    <div class="panel-section">
-        <div class="section-title">🎬 Scene & Mappe</div>
-        <div class="list-container" id="scene-list"></div>
-        <button id="btn-new-scene" class="row-btn btn-primary" style="width: 100%; margin-bottom:12px;">+ Nuova Scena</button>
+    <button class="acc-btn active">🎬 Mappe e Livelli</button>
+    <div class="acc-content" style="display: block;">
+        <div class="list-container" id="scene-list" style="margin-bottom: 12px;"></div>
+        <button id="btn-new-scene" class="row-btn btn-primary" style="width: 100%; margin-bottom:15px;">+ Nuova Scena</button>
         
-        <div class="section-title">📑 Livelli della Scena</div>
+        <label>Aggiungi Livello:</label>
         <div class="row" style="margin-bottom: 8px;">
-            <button id="btn-upload-trigger" class="row-btn" style="background: rgba(255,255,255,0.15);">📁 Media</button>
+            <button id="btn-upload-trigger" class="row-btn" style="background: rgba(255,255,255,0.15);">📁 Img/Video</button>
             <button id="btn-yt-layer" class="row-btn" style="background: rgba(255,59,48,0.8);">🔴 YouTube</button>
             <input type="file" id="upload-layer" accept="image/*,video/*" class="hidden">
         </div>
         <div class="list-container" id="layer-list"></div>
     </div>
 
-    <div class="panel-section">
-        <div class="section-title">⚙️ Regolazioni Strumenti</div>
-        
+    <button class="acc-btn">⚙️ Strumenti e Regolazioni</button>
+    <div class="acc-content">
         <label>Colore Evidenziatore:</label>
-        <div class="row" id="hl-color-picker" style="margin-bottom: 12px; justify-content: space-between;">
+        <div class="row" id="hl-color-picker" style="margin-bottom: 15px; justify-content: space-between;">
             <button class="color-swatch active" data-color="#ff3b30" style="background:#ff3b30;" title="Rosso"></button>
             <button class="color-swatch" data-color="#34c759" style="background:#34c759;" title="Verde"></button>
             <button class="color-swatch" data-color="#ffcc00" style="background:#ffcc00;" title="Giallo"></button>
@@ -210,22 +190,21 @@
         <label>Spessore Nebbia / Tratto:</label>
         <input type="range" id="brush-size" min="10" max="300" value="80">
 
-        <button id="clear-drawings" class="row-btn btn-danger" style="width:100%; margin-bottom: 15px;">🗑️ Pulisci i Disegni dal Layer</button>
+        <button id="clear-drawings" class="row-btn btn-danger" style="width:100%; margin: 5px 0 15px 0;">🗑️ Pulisci i Disegni dal Layer</button>
 
-        <div class="section-title">⚙️ Regolazioni Layer</div>
-
-        <label style="display:flex; justify-content:space-between;">Rotazione: <span id="rot-display" style="color:#ffcc00;">0°</span></label>
+        <label style="display:flex; justify-content:space-between;">Rotazione Livello: <span id="rot-display" style="color:#ffcc00;">0°</span></label>
         <div class="row">
             <input type="range" id="layer-rotation" min="0" max="360" value="0" style="flex:1; margin:0;">
             <button id="btn-reset-rot" class="mini-btn" style="width:36px; height:30px;">0°</button>
         </div>
 
-        <label style="display:flex; justify-content:space-between; margin-top:12px;">Volume Video: <span id="vol-display" style="color:#34c759;">0%</span></label>
+        <label style="display:flex; justify-content:space-between; margin-top:15px;">Volume Video: <span id="vol-display" style="color:#34c759;">0%</span></label>
         <input type="range" id="layer-volume" min="0" max="100" value="0" disabled>
     </div>
 
-    <div class="panel-section">
-        <div class="section-title">🌗 Atmosfera Layer</div>
+    <button class="acc-btn">🌗 Atmosfera e Extra</button>
+    <div class="acc-content">
+        <label>Filtro Meteo (Sul Layer):</label>
         <select id="atmosphere-select">
             <option value="none">☀️ Sereno (Nessun filtro)</option>
             <option value="night">🌙 Notte Oscura</option>
@@ -237,16 +216,15 @@
             <option value="sepia">📜 Pergamena</option>
         </select>
 
-        <div class="section-title" style="margin-top: 15px;">📐 Proiettore</div>
-        <button id="toggle-square" class="row-btn" style="width: 100%; margin-bottom:8px; border: 1px solid #ff9500;">Mostra Calibrazione Rossa</button>
+        <label style="margin-top: 15px;">Calibrazione Proiettore:</label>
+        <button id="toggle-square" class="row-btn" style="width: 100%; margin-bottom:8px; border: 1px solid #ff9500; background: rgba(255,149,0,0.2);">Mostra Quadrato Rosso</button>
         <input type="range" id="square-size" min="1" max="1000" value="50">
     </div>
 
-    <div class="row">
+    <div class="row" style="margin-top: 4px;">
         <button id="btn-fullscreen" class="row-btn" style="background:#5ac8fa; color:black;">🔲 Schermo Intero</button>
-        <button id="hide-ui" class="row-btn btn-success">Nascondi UI</button>
+        <button id="hide-ui" class="row-btn" style="background:rgba(255,255,255,0.2);">Nascondi UI</button>
     </div>
-    <div style="text-align: center; font-size: 10px; color: #888; margin-top: 4px;">(Doppio tap sulla mappa per nascondere i menu. Tieni premuto per il Ping!)</div>
 </div>
 
 <button id="reveal-ui" class="hidden">⚙️</button>
@@ -258,18 +236,32 @@
 </div>
 
 <script>
-// --- SISTEMA DI NOTIFICHE TOAST ---
+// --- LOGICA ACCORDION ---
+document.querySelectorAll('.acc-btn').forEach(btn => {
+    btn.onclick = () => {
+        const content = btn.nextElementSibling;
+        const isActive = btn.classList.contains('active');
+        
+        // Chiudi tutti
+        document.querySelectorAll('.acc-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.acc-content').forEach(c => c.style.display = 'none');
+        
+        // Apri solo se non era già aperto
+        if (!isActive) {
+            btn.classList.add('active');
+            content.style.display = 'block';
+        }
+    };
+});
+
+// --- SISTEMA NOTIFICHE TOAST ---
 function showToast(msg, type = 'info') {
     const container = document.getElementById('toast-container');
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
     toast.innerText = msg;
     container.appendChild(toast);
-    
-    requestAnimationFrame(() => {
-        toast.classList.add('show');
-    });
-
+    requestAnimationFrame(() => toast.classList.add('show'));
     setTimeout(() => {
         toast.classList.remove('show');
         setTimeout(() => toast.remove(), 400); 
@@ -289,7 +281,7 @@ try {
     let layerCounter = 0;
     const MAX_FOG_RES = 1500;
     let layerToRelink = null;
-    let currentHlColor = '#ff3b30'; // Colore iniziale evidenziatore
+    let currentHlColor = '#ff3b30';
 
     const viewport = document.getElementById('viewport');
     const worldContainer = document.getElementById('world-container');
@@ -300,7 +292,6 @@ try {
     const rotSlider = document.getElementById('layer-rotation');
     const volSlider = document.getElementById('layer-volume');
     const calibSquare = document.getElementById('calibration-square');
-    
     const rotDisplay = document.getElementById('rot-display');
     const volDisplay = document.getElementById('vol-display');
 
@@ -433,7 +424,6 @@ try {
         }
     }
 
-    // --- NUOVA GENERAZIONE DOM CON DOPPIO CANVAS (Nebbia + Evidenziatore) ---
     function createLayerDOM(mediaSrc, naturalWidth, naturalHeight, fogRatio, existingFogData = null, existingHlData = null, isVideo = false, ytId = null) {
         return new Promise((resolve) => {
             let mediaEl;
@@ -470,7 +460,6 @@ try {
             atmosphere.className = 'layer-atmosphere';
             wrapper.appendChild(atmosphere);
             
-            // Canvas Nebbia
             const canvas = document.createElement('canvas');
             canvas.className = 'fog-canvas';
             canvas.width = naturalWidth * fogRatio; 
@@ -478,7 +467,6 @@ try {
             const ctx = canvas.getContext('2d');
             wrapper.appendChild(canvas);
 
-            // NUOVO Canvas Evidenziatore (Stessa risoluzione, sta sopra la nebbia)
             const hlCanvas = document.createElement('canvas');
             hlCanvas.className = 'hl-canvas';
             hlCanvas.width = naturalWidth * fogRatio; 
@@ -486,7 +474,6 @@ try {
             const hlCtx = hlCanvas.getContext('2d');
             wrapper.appendChild(hlCanvas);
 
-            // Caricamento asincrono per non bloccare se ci sono vecchi salvataggi
             let fogPromise = existingFogData ? new Promise(r => { let img = new Image(); img.onload = () => { ctx.drawImage(img, 0, 0); r(); }; img.src = existingFogData; }) : Promise.resolve();
             let hlPromise = existingHlData ? new Promise(r => { let img = new Image(); img.onload = () => { hlCtx.drawImage(img, 0, 0); r(); }; img.src = existingHlData; }) : Promise.resolve();
             let mediaPromise = (!ytId && mediaSrc) ? new Promise(r => { if(isVideo) { mediaEl.onloadeddata = r; } else { mediaEl.onload = r; } }) : Promise.resolve();
@@ -537,13 +524,12 @@ try {
 
     // --- EVENT LISTENERS UI ---
 
-    // Palette Colori
     document.querySelectorAll('.color-swatch').forEach(btn => {
         btn.onclick = () => {
             document.querySelectorAll('.color-swatch').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             currentHlColor = btn.dataset.color;
-            updateToolUI('hl-draw'); // Passa automaticamente allo strumento disegno
+            updateToolUI('hl-draw'); 
         };
     });
 
@@ -694,7 +680,6 @@ try {
         e.target.value = '';
     });
 
-    // SALVATAGGIO AGGIORNATO (Include hlData per i disegni canvas)
     document.getElementById('btn-save-project').onclick = () => {
         for (let s of scenes) {
             for (let l of s.layers) {
@@ -735,7 +720,6 @@ try {
 
     document.getElementById('btn-load-trigger').onclick = () => document.getElementById('upload-project').click();
 
-    // CARICAMENTO AGGIORNATO (Include caricamento hlData)
     document.getElementById('upload-project').addEventListener('change', (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -764,8 +748,6 @@ try {
                         const needsRelink = isVid && !layerData.imgSrc && !ytId; 
                         const domSrc = safeBase64ToBlobUrl(layerData.imgSrc);
                         const domFog = layerData.fogData ? safeBase64ToBlobUrl(layerData.fogData) : null;
-                        
-                        // Compatibilità retroattiva per file senza hlData
                         const domHl = layerData.hlData ? safeBase64ToBlobUrl(layerData.hlData) : null;
 
                         const domElements = await createLayerDOM(domSrc, layerData.nWidth, layerData.nHeight, layerData.fogRatio, domFog, domHl, isVid, ytId);
@@ -804,7 +786,6 @@ try {
         });
     }
 
-    // --- NUOVA GRAFICA LAYER (Spaziosa su 2 righe) ---
     function renderLayers() {
         const scene = scenes.find(s => s.id === currentSceneId);
         layerListEl.innerHTML = '';
@@ -838,7 +819,6 @@ try {
             container.className = `layer-item-container ${layer.id === activeLayerId ? 'active' : ''}`;
             container.onclick = () => { activeLayerId = layer.id; if(currentMode === 'camera') updateToolUI('layer'); else renderLayers(); };
 
-            // Riga Superiore: Nome e Azioni Distruttive/Visibilità
             const topRow = document.createElement('div'); topRow.className = 'layer-top-row';
             const nameWrap = document.createElement('div'); nameWrap.className = 'layer-name-wrap';
             nameWrap.innerText = layer.name + (layer.ytId ? " 🔴" : (layer.isVideo ? " 🎥" : ""));
@@ -863,7 +843,6 @@ try {
             topRow.appendChild(nameWrap);
             topRow.appendChild(topBtns);
 
-            // Riga Inferiore: Strumenti di Manipolazione
             const botRow = document.createElement('div'); botRow.className = 'layer-bottom-row';
 
             const btnUp = document.createElement('button'); btnUp.className = 'mini-btn'; btnUp.innerText = '🔼'; btnUp.title = "Sposta Su";
@@ -953,7 +932,6 @@ try {
         else doGlobalZoom(factor, e.clientX, e.clientY);
     }, {passive: false});
 
-    // NUOVI STRUMENTI AGGIORNATI
     const tools = { 
         'camera': document.getElementById('tool-camera'), 
         'layer': document.getElementById('tool-layer'), 
@@ -1051,7 +1029,6 @@ try {
             drawLastX = drawCurrX; drawLastY = drawCurrY;
             activeLayer.ctx.beginPath(); activeLayer.ctx.moveTo(drawCurrX, drawCurrY); activeLayer.ctx.lineTo(drawCurrX+0.1, drawCurrY+0.1); activeLayer.ctx.stroke();
         } 
-        // NUOVA LOGICA: HIGHLIGHTER SU CANVAS
         else if ((currentMode === 'hl-draw' || currentMode === 'hl-erase') && activeLayer) {
             const rawPos = getLayerLocalCoordsRaw(pos.x, pos.y, scene, activeLayer);
             activeLayer.hlCtx.lineWidth = (document.getElementById('brush-size').value / scene.scale / activeLayer.scale) * activeLayer.fogRatio;
@@ -1117,7 +1094,6 @@ try {
                 });
             }
         }
-        // NUOVA LOGICA: MUOVI HIGHLIGHTER CANVAS
         else if ((currentMode === 'hl-draw' || currentMode === 'hl-erase') && activeLayer) {
             const rawPos = getLayerLocalCoordsRaw(pos.x, pos.y, scene, activeLayer);
             drawCurrX = rawPos.x * activeLayer.fogRatio; 
