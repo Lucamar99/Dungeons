@@ -3,12 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>D&D Tavolo Proiettore - V33 Ultra Glass UI</title>
+    <title>D&D Tavolo Proiettore - V34 Pro UI</title>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
     <style>
         /* --- RESET E BASE --- */
         *, *::before, *::after { box-sizing: border-box; }
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #050505; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #eee; }
         
+        .material-symbols-rounded { vertical-align: middle; }
+
         /* --- MOTORE GRAFICO --- */
         #viewport { position: relative; width: 100vw; height: 100vh; overflow: hidden; touch-action: none; }
         #world-container { position: absolute; top: 0; left: 0; transform-origin: 0 0; will-change: transform; width: 0; height: 0; }
@@ -37,13 +40,13 @@
 
         #calibration-square { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); border: 4px solid #ff3333; background: rgba(255, 51, 51, 0.3); z-index: 1000; pointer-events: none; width: 50px; height: 50px; display: none; }
 
-        /* --- UI ULTRA GLASSMORPHISM --- */
+        /* --- UI GLASSMORPHISM (Ottimizzato Anti-Lag) --- */
         .glass-panel {
-            background: rgba(15, 20, 25, 0.55); /* Più trasparente per far passare i colori */
-            backdrop-filter: blur(30px); /* Sfocatura più intensa */
-            -webkit-backdrop-filter: blur(30px);
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+            background: rgba(20, 24, 28, 0.85); /* Leggermente più opaco */
+            backdrop-filter: blur(8px); /* Blur abbassato drasticamente per prestazioni */
+            -webkit-backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
             z-index: 950;
             transition: opacity 0.3s ease;
         }
@@ -59,15 +62,16 @@
         
         .tool-btn { 
             width: 48px; height: 48px; border-radius: 14px; border: none; cursor: pointer; 
-            background: rgba(255,255,255,0.06); color: white; font-size: 22px; flex-shrink: 0; 
+            background: rgba(255,255,255,0.06); color: white; flex-shrink: 0; 
             display: flex; align-items: center; justify-content: center; 
             transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); outline: 2px solid transparent; 
         }
+        .tool-btn .material-symbols-rounded { font-size: 26px; }
         .tool-btn:hover { background: rgba(255,255,255,0.15); transform: scale(1.05); }
         .tool-btn:active { transform: scale(0.95); }
         .tool-btn.active { background: #0a84ff; box-shadow: 0 0 18px rgba(10, 132, 255, 0.6); outline: 2px solid rgba(255,255,255,0.5); }
 
-        /* PANNELLO DESTRA COMPATTO */
+        /* PANNELLO DESTRA */
         #right-panel {
             position: absolute; top: 20px; right: 20px;
             width: 340px; border-radius: 20px; padding: 16px;
@@ -77,26 +81,20 @@
         #right-panel::-webkit-scrollbar { width: 6px; }
         #right-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.25); border-radius: 10px; }
 
-        /* ACCORDIONS (Ora anch'essi in stile Glass) */
+        /* ACCORDIONS E GRUPPI (Senza spaziature brutte) */
+        .acc-group { display: flex; flex-direction: column; width: 100%; border-radius: 12px; overflow: hidden; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); }
         .acc-btn { 
-            width: 100%; text-align: left; background: rgba(255,255,255,0.05); color: #fff; 
+            width: 100%; text-align: left; background: transparent; color: #fff; 
             padding: 14px; font-size: 13px; text-transform: uppercase; font-weight: 700; 
-            border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; cursor: pointer; 
-            transition: all 0.3s ease; letter-spacing: 0.5px; backdrop-filter: blur(10px);
+            border: none; cursor: pointer; transition: all 0.3s ease; letter-spacing: 0.5px;
+            display: flex; align-items: center; gap: 8px;
         }
-        .acc-btn:hover { background: rgba(255,255,255,0.12); }
-        .acc-btn.active { 
-            background: rgba(10, 132, 255, 0.2); border-color: rgba(10, 132, 255, 0.5); 
-            border-bottom-left-radius: 0; border-bottom-right-radius: 0; 
-        }
-        .acc-content { 
-            display: none; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.1); 
-            border-top: none; padding: 14px; border-bottom-left-radius: 12px; 
-            border-bottom-right-radius: 12px; margin-bottom: 4px; backdrop-filter: blur(10px);
-        }
+        .acc-btn:hover { background: rgba(255,255,255,0.05); }
+        .acc-btn.active { background: rgba(10, 132, 255, 0.15); border-bottom: 1px solid rgba(10, 132, 255, 0.3); }
+        .acc-content { display: none; padding: 14px; }
 
         .row { display: flex; gap: 8px; align-items: center; }
-        .row-btn { flex: 1; padding: 12px; border-radius: 10px; border: none; background: rgba(255,255,255,0.1); color: white; font-weight: 600; font-size: 13px; cursor: pointer; transition: 0.2s; backdrop-filter: blur(5px); }
+        .row-btn { flex: 1; padding: 12px; border-radius: 10px; border: none; background: rgba(255,255,255,0.1); color: white; font-weight: 600; font-size: 13px; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; gap: 6px; }
         .row-btn:hover { background: rgba(255,255,255,0.2); }
         .btn-primary { background: #0a84ff; } .btn-primary:hover { background: #007aff; }
         .btn-warning { background: #ff9f0a; color: black; } .btn-warning:hover { background: #ff8c00; }
@@ -104,7 +102,7 @@
 
         label { font-size: 11px; color: #bbb; display: block; margin: 10px 0 6px 0; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;}
         input[type="range"] { width: 100%; margin: 5px 0 15px 0; accent-color: #0a84ff; height: 6px; border-radius: 5px; outline: none; }
-        select { width: 100%; background: rgba(0,0,0,0.4); color: white; border: 1px solid rgba(255,255,255,0.2); padding: 10px; border-radius: 10px; font-size: 14px; outline: none; backdrop-filter: blur(10px); }
+        select { width: 100%; background: rgba(0,0,0,0.4); color: white; border: 1px solid rgba(255,255,255,0.2); padding: 10px; border-radius: 10px; font-size: 14px; outline: none; }
         select option { background: #222; }
 
         /* Palette Evidenziatore */
@@ -112,54 +110,34 @@
         .color-swatch:hover { transform: scale(1.1); }
         .color-swatch.active { border-color: white; transform: scale(1.2); box-shadow: 0 0 12px currentColor; }
 
-        /* --- CARDS DEI LIVELLI E DELLE SCENE (Nuovo Layout a Griglia) --- */
+        /* CARDS (Scene e Layer) */
         .list-container { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
-        
-        .scene-item, .layer-item-container { 
-            display: flex; flex-direction: column; background: rgba(255,255,255,0.04); 
-            padding: 10px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); 
-            gap: 10px; transition: 0.2s; cursor: pointer; backdrop-filter: blur(5px);
-        }
-        
-        /* Evidenzia la scena o il livello attivo */
-        .scene-item.active, .layer-item-container.active { 
-            border-color: rgba(10, 132, 255, 0.6); 
-            background: rgba(10, 132, 255, 0.15); 
-            box-shadow: 0 0 15px rgba(10, 132, 255, 0.2); 
-        }
+        .scene-item, .layer-item-container { display: flex; flex-direction: column; background: rgba(0,0,0,0.4); padding: 10px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05); gap: 10px; transition: 0.2s; cursor: pointer; }
+        .scene-item.active, .layer-item-container.active { border-color: rgba(10, 132, 255, 0.6); background: rgba(10, 132, 255, 0.15); box-shadow: 0 0 15px rgba(10, 132, 255, 0.1); }
         
         .layer-top-row { display: flex; justify-content: space-between; align-items: center; width: 100%; }
-        .layer-name-wrap { flex: 1; font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 10px; text-shadow: 0 1px 3px rgba(0,0,0,0.8); }
+        .layer-name-wrap { flex: 1; font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 10px; display: flex; align-items: center; gap: 6px; }
         
-        /* Nuova Griglia perfetta per i pulsantini inferiori */
-        .layer-bottom-grid {
-            display: grid;
-            grid-template-columns: repeat(5, 1fr);
-            gap: 6px;
-            width: 100%;
-        }
+        .layer-bottom-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; width: 100%; }
 
-        .mini-btn { 
-            width: 100%; height: 34px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); 
-            background: rgba(0,0,0,0.4); color: white; font-size: 14px; cursor: pointer; 
-            display: flex; align-items: center; justify-content: center; transition: 0.2s; 
-        }
+        .mini-btn { width: 100%; height: 34px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.4); color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
+        .mini-btn .material-symbols-rounded { font-size: 18px; }
         .mini-btn:hover { background: rgba(255,255,255,0.2); transform: translateY(-1px); }
         .mini-btn.danger { color: #ff453a; }
         .mini-btn.danger:hover { background: rgba(255, 69, 58, 0.2); }
         
         .hidden { display: none !important; opacity: 0; pointer-events: none; }
         
-        #reveal-ui { position: absolute; top: 20px; right: 20px; z-index: 1000; background: rgba(25,30,35,0.8); backdrop-filter: blur(20px); color: white; border-radius: 50%; width: 60px; height: 60px; font-size: 26px; border: 1px solid rgba(255,255,255,0.2); cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 20px rgba(0,0,0,0.6);}
+        #reveal-ui { position: absolute; top: 20px; right: 20px; z-index: 1000; background: rgba(25,30,35,0.8); backdrop-filter: blur(10px); color: white; border-radius: 50%; width: 60px; height: 60px; border: 1px solid rgba(255,255,255,0.2); cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 20px rgba(0,0,0,0.6);}
 
         /* TOAST NOTIFICATIONS */
         #toast-container { position: fixed; top: 30px; left: 50%; transform: translateX(-50%); z-index: 9999; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
-        .toast { background: rgba(20, 20, 20, 0.95); backdrop-filter: blur(20px); border-radius: 30px; padding: 14px 28px; color: white; font-size: 15px; font-weight: 600; box-shadow: 0 10px 30px rgba(0,0,0,0.6); opacity: 0; transform: translateY(-20px); transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55); border: 1px solid rgba(255,255,255,0.1); }
+        .toast { background: rgba(20, 20, 20, 0.95); backdrop-filter: blur(10px); border-radius: 30px; padding: 14px 28px; color: white; font-size: 15px; font-weight: 600; box-shadow: 0 10px 30px rgba(0,0,0,0.6); opacity: 0; transform: translateY(-20px); transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55); border: 1px solid rgba(255,255,255,0.1); }
         .toast.show { opacity: 1; transform: translateY(0); }
         .toast.error { border-color: #ff453a; color: #ff5e55; }
         .toast.success { border-color: #32d74b; color: #4cd964; }
 
-        #loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(10px); z-index: 2000; display: flex; justify-content: center; align-items: center; flex-direction: column; color: white; font-size: 18px; font-weight: bold; letter-spacing: 1px; display: none; }
+        #loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(5px); z-index: 2000; display: flex; justify-content: center; align-items: center; flex-direction: column; color: white; font-size: 18px; font-weight: bold; letter-spacing: 1px; display: none; }
         .spinner { border: 4px solid rgba(255,255,255,0.1); border-top: 4px solid #0a84ff; border-radius: 50%; width: 60px; height: 60px; animation: spin 1s linear infinite; margin-bottom: 20px; }
 
         /* ADATTAMENTO MOBILE */
@@ -179,99 +157,105 @@
 <div id="atmosphere-overlay"></div>
 
 <div id="left-toolbar" class="glass-panel">
-    <button id="tool-camera" class="tool-btn active" title="Sposta Camera">🗺️</button>
-    <button id="tool-layer" class="tool-btn" title="Sposta Livello">🎯</button>
-    <button id="btn-lock-camera" class="tool-btn" title="Blocca Camera">🔓</button>
+    <button id="tool-camera" class="tool-btn active" title="Sposta Camera"><span class="material-symbols-rounded">pan_tool</span></button>
+    <button id="tool-layer" class="tool-btn" title="Sposta Livello"><span class="material-symbols-rounded">layers</span></button>
+    <button id="btn-lock-camera" class="tool-btn" title="Blocca Camera"><span class="material-symbols-rounded">lock_open</span></button>
     
     <div class="toolbar-divider"></div>
     
-    <button id="tool-draw" class="tool-btn" title="Aggiungi Nebbia">☁️</button>
-    <button id="tool-erase" class="tool-btn" title="Cancella Nebbia">🧽</button>
-    <button id="fill-fog" class="tool-btn" title="Copri tutto">🌫️</button>
-    <button id="clear-fog" class="tool-btn" title="Pulisci tutto">🧹</button>
+    <button id="tool-draw" class="tool-btn" title="Aggiungi Nebbia"><span class="material-symbols-rounded">cloud</span></button>
+    <button id="tool-erase" class="tool-btn" title="Cancella Nebbia"><span class="material-symbols-rounded">ink_eraser</span></button>
+    <button id="fill-fog" class="tool-btn" title="Copri tutto"><span class="material-symbols-rounded">texture</span></button>
+    <button id="clear-fog" class="tool-btn" title="Pulisci tutto"><span class="material-symbols-rounded">delete_sweep</span></button>
     
     <div class="toolbar-divider"></div>
     
-    <button id="tool-hl-draw" class="tool-btn" title="Evidenzia">🖍️</button>
-    <button id="tool-hl-erase" class="tool-btn" title="Gomma Evidenziatore">🧽🖍️</button>
+    <button id="tool-hl-draw" class="tool-btn" title="Evidenzia"><span class="material-symbols-rounded">brush</span></button>
+    <button id="tool-hl-erase" class="tool-btn" title="Gomma Evidenziatore"><span class="material-symbols-rounded">cleaning_services</span></button>
 </div>
 
 <div id="right-panel" class="glass-panel">
     
     <div class="row" style="margin-bottom: 4px;">
-        <button id="btn-save-project" class="row-btn btn-warning">💾 Salva</button>
-        <button id="btn-load-trigger" class="row-btn btn-primary">📂 Carica</button>
+        <button id="btn-save-project" class="row-btn btn-warning"><span class="material-symbols-rounded">save</span> Salva</button>
+        <button id="btn-load-trigger" class="row-btn btn-primary"><span class="material-symbols-rounded">folder_open</span> Carica</button>
         <input type="file" id="upload-project" accept=".json" class="hidden">
     </div>
 
-    <button class="acc-btn active">🎬 Mappe e Livelli</button>
-    <div class="acc-content" style="display: block;">
-        <div class="list-container" id="scene-list" style="margin-bottom: 12px;"></div>
-        <button id="btn-new-scene" class="row-btn btn-primary" style="width: 100%; margin-bottom:15px;">+ Nuova Scena</button>
-        
-        <label>Aggiungi Livello alla Scena:</label>
-        <div class="row" style="margin-bottom: 12px;">
-            <button id="btn-upload-trigger" class="row-btn" style="background: rgba(255,255,255,0.15);">📁 Media Locale</button>
-            <button id="btn-yt-layer" class="row-btn" style="background: rgba(255,59,48,0.8);">🔴 YouTube</button>
-            <input type="file" id="upload-layer" accept="image/*,video/*" class="hidden">
+    <div class="acc-group">
+        <button class="acc-btn active"><span class="material-symbols-rounded">map</span> Mappe e Livelli</button>
+        <div class="acc-content" style="display: block;">
+            <div class="list-container" id="scene-list" style="margin-bottom: 12px;"></div>
+            <button id="btn-new-scene" class="row-btn btn-primary" style="width: 100%; margin-bottom:15px;"><span class="material-symbols-rounded">add</span> Nuova Scena</button>
+            
+            <label>Aggiungi Livello alla Scena:</label>
+            <div class="row" style="margin-bottom: 12px;">
+                <button id="btn-upload-trigger" class="row-btn" style="background: rgba(255,255,255,0.15);"><span class="material-symbols-rounded">image</span> Img/Video</button>
+                <button id="btn-yt-layer" class="row-btn" style="background: rgba(255,59,48,0.8);"><span class="material-symbols-rounded">smart_display</span> YouTube</button>
+                <input type="file" id="upload-layer" accept="image/*,video/*" class="hidden">
+            </div>
+            <div class="list-container" id="layer-list"></div>
         </div>
-        <div class="list-container" id="layer-list"></div>
     </div>
 
-    <button class="acc-btn">⚙️ Regolazioni</button>
-    <div class="acc-content">
-        <label>Colore Evidenziatore:</label>
-        <div class="row" id="hl-color-picker" style="margin-bottom: 15px; justify-content: space-between;">
-            <button class="color-swatch active" data-color="#ff3b30" style="background:#ff3b30;" title="Rosso"></button>
-            <button class="color-swatch" data-color="#34c759" style="background:#34c759;" title="Verde"></button>
-            <button class="color-swatch" data-color="#ffcc00" style="background:#ffcc00;" title="Giallo"></button>
-            <button class="color-swatch" data-color="#5ac8fa" style="background:#5ac8fa;" title="Azzurro"></button>
-            <button class="color-swatch" data-color="#ff2d55" style="background:#ff2d55;" title="Rosa"></button>
-            <button class="color-swatch" data-color="#ffffff" style="background:#ffffff;" title="Bianco"></button>
+    <div class="acc-group">
+        <button class="acc-btn"><span class="material-symbols-rounded">tune</span> Regolazioni</button>
+        <div class="acc-content">
+            <label>Colore Evidenziatore:</label>
+            <div class="row" id="hl-color-picker" style="margin-bottom: 15px; justify-content: space-between;">
+                <button class="color-swatch active" data-color="#ff3b30" style="background:#ff3b30;" title="Rosso"></button>
+                <button class="color-swatch" data-color="#34c759" style="background:#34c759;" title="Verde"></button>
+                <button class="color-swatch" data-color="#ffcc00" style="background:#ffcc00;" title="Giallo"></button>
+                <button class="color-swatch" data-color="#5ac8fa" style="background:#5ac8fa;" title="Azzurro"></button>
+                <button class="color-swatch" data-color="#ff2d55" style="background:#ff2d55;" title="Rosa"></button>
+                <button class="color-swatch" data-color="#ffffff" style="background:#ffffff;" title="Bianco"></button>
+            </div>
+
+            <label>Spessore Pennelli:</label>
+            <input type="range" id="brush-size" min="10" max="300" value="80">
+
+            <button id="clear-drawings" class="row-btn btn-danger" style="width:100%; margin: 5px 0 20px 0;"><span class="material-symbols-rounded">delete</span> Pulisci Disegni (Livello)</button>
+
+            <label style="display:flex; justify-content:space-between;">Rotazione: <span id="rot-display" style="color:#ffcc00;">0°</span></label>
+            <div class="row">
+                <input type="range" id="layer-rotation" min="0" max="360" value="0" style="flex:1; margin:0;">
+                <button id="btn-reset-rot" class="row-btn" style="flex:none; width:48px; padding:6px;">0°</button>
+            </div>
+
+            <label style="display:flex; justify-content:space-between; margin-top:20px;">Volume: <span id="vol-display" style="color:#34c759;">0%</span></label>
+            <input type="range" id="layer-volume" min="0" max="100" value="0" disabled>
         </div>
-
-        <label>Spessore Pennelli:</label>
-        <input type="range" id="brush-size" min="10" max="300" value="80">
-
-        <button id="clear-drawings" class="row-btn btn-danger" style="width:100%; margin: 5px 0 20px 0;">🗑️ Pulisci Disegni (Livello Attivo)</button>
-
-        <label style="display:flex; justify-content:space-between;">Rotazione: <span id="rot-display" style="color:#ffcc00;">0°</span></label>
-        <div class="row">
-            <input type="range" id="layer-rotation" min="0" max="360" value="0" style="flex:1; margin:0;">
-            <button id="btn-reset-rot" class="mini-btn" style="width:40px; height:34px;">0°</button>
-        </div>
-
-        <label style="display:flex; justify-content:space-between; margin-top:20px;">Volume: <span id="vol-display" style="color:#34c759;">0%</span></label>
-        <input type="range" id="layer-volume" min="0" max="100" value="0" disabled>
     </div>
 
-    <button class="acc-btn">🌗 Atmosfera e Extra</button>
-    <div class="acc-content">
-        <label>Filtro Meteo (Livello Attivo):</label>
-        <select id="atmosphere-select">
-            <option value="none">☀️ Sereno (Nessun filtro)</option>
-            <option value="night">🌙 Notte Oscura</option>
-            <option value="fire">🔥 Incendio / Pericolo</option>
-            <option value="rain">🌧️ Pioggia Animata</option>
-            <option value="snow">❄️ Neve Animata</option>
-            <option value="swamp">☠️ Palude Tossica</option>
-            <option value="blood">🩸 Sangue</option>
-            <option value="sepia">📜 Pergamena</option>
-        </select>
+    <div class="acc-group">
+        <button class="acc-btn"><span class="material-symbols-rounded">routine</span> Atmosfera e Extra</button>
+        <div class="acc-content">
+            <label>Filtro Meteo (Sul Livello):</label>
+            <select id="atmosphere-select">
+                <option value="none">Sereno (Nessun filtro)</option>
+                <option value="night">Notte Oscura</option>
+                <option value="fire">Incendio / Pericolo</option>
+                <option value="rain">Pioggia Animata</option>
+                <option value="snow">Neve Animata</option>
+                <option value="swamp">Palude Tossica</option>
+                <option value="blood">Furia Sanguinaria</option>
+                <option value="sepia">Pergamena Antica</option>
+            </select>
 
-        <label style="margin-top: 20px;">Mirino Proiettore (Calibrazione):</label>
-        <button id="toggle-square" class="row-btn" style="width: 100%; margin-bottom:10px; border: 1px solid #ff9f00; background: rgba(255,159,0,0.15);">Mostra Mirino Rosso</button>
-        <input type="range" id="square-size" min="1" max="1000" value="50">
+            <label style="margin-top: 20px;">Calibrazione Proiettore:</label>
+            <button id="toggle-square" class="row-btn" style="width: 100%; margin-bottom:10px; border: 1px solid #ff9f00; background: rgba(255,159,0,0.15);"><span class="material-symbols-rounded">crop_free</span> Mostra Mirino Rosso</button>
+            <input type="range" id="square-size" min="1" max="1000" value="50">
+        </div>
     </div>
 
     <div class="row" style="margin-top: 4px;">
-        <button id="btn-fullscreen" class="row-btn" style="background:rgba(90, 200, 250, 0.2); border: 1px solid #5ac8fa; color:#5ac8fa;">🔲 Schermo Intero</button>
-        <button id="hide-ui" class="row-btn" style="background:rgba(255,255,255,0.1);">Nascondi UI</button>
+        <button id="btn-fullscreen" class="row-btn" style="background:rgba(90, 200, 250, 0.2); border: 1px solid #5ac8fa; color:#5ac8fa;"><span class="material-symbols-rounded">fullscreen</span> Intero</button>
+        <button id="hide-ui" class="row-btn" style="background:rgba(255,255,255,0.1);"><span class="material-symbols-rounded">visibility_off</span> Nascondi</button>
     </div>
-    <div style="text-align: center; font-size: 11px; color: rgba(255,255,255,0.5); margin-top: 8px;">(Doppio tap sulla mappa per nascondere i menu. Tieni premuto per il Ping!)</div>
+    <div style="text-align: center; font-size: 11px; color: rgba(255,255,255,0.4); margin-top: 8px;">(Doppio tap sulla mappa per nascondere. Tieni premuto per il Ping!)</div>
 </div>
 
-<button id="reveal-ui" class="hidden">⚙️</button>
+<button id="reveal-ui" class="hidden"><span class="material-symbols-rounded">settings</span></button>
 <input type="file" id="upload-relink" accept="video/*" class="hidden">
 
 <div id="viewport">
@@ -430,7 +414,7 @@ try {
         scenes.push(newScene);
         switchScene(newScene.id);
         renderSceneList();
-        showToast(`Creata nuova ${newScene.name}`, "success");
+        showToast(`Creata ${newScene.name}`, "success");
     }
 
     function switchScene(id) {
@@ -480,10 +464,10 @@ try {
 
     function updateCameraLockUI(scene) {
         if (scene.cameraLocked) {
-            btnLockCamera.innerText = '🔒'; 
+            btnLockCamera.innerHTML = '<span class="material-symbols-rounded">lock</span>'; 
             btnLockCamera.classList.add('color-red');
         } else {
-            btnLockCamera.innerText = '🔓'; 
+            btnLockCamera.innerHTML = '<span class="material-symbols-rounded">lock_open</span>'; 
             btnLockCamera.classList.remove('color-red');
         }
     }
@@ -565,7 +549,7 @@ try {
         scene.layers.forEach(l => updateLayerTransform(l));
         renderLayers();
         applyLayerAtmosphere(newLayer);
-        showToast("Media aggiunto!", "success");
+        showToast("Livello aggiunto!", "success");
     }
 
     function updateLayerTransform(layer) {
@@ -614,18 +598,10 @@ try {
         const layer = scene?.layers.find(l => l.id === activeLayerId);
         if(layer) { 
             layer.hlCtx.clearRect(0, 0, layer.hlCanvas.width, layer.hlCanvas.height); 
-            showToast("Disegni rimossi dal livello.", "success");
+            showToast("Disegni rimossi.", "success");
         } else {
             showToast("Seleziona un livello da pulire.", "error");
         }
-    };
-
-    btnLockCamera.onclick = () => {
-        const scene = scenes.find(s => s.id === currentSceneId);
-        if (!scene) return;
-        scene.cameraLocked = !scene.cameraLocked;
-        updateCameraLockUI(scene);
-        showToast(scene.cameraLocked ? "Mappa bloccata" : "Mappa sbloccata");
     };
 
     document.getElementById('btn-upload-trigger').onclick = () => document.getElementById('upload-layer').click();
@@ -647,7 +623,7 @@ try {
 
         layerCounter++;
         const newLayer = {
-            id: layerCounter, name: `YouTube Mappa`, fileName: `YT: ${ytId}`, imgSrc: null, ytId: ytId, 
+            id: layerCounter, name: `Mappa YouTube`, fileName: `YT: ${ytId}`, imgSrc: null, ytId: ytId, 
             nWidth: nWidth, nHeight: nHeight, wrapper: domElements.wrapper, canvas: domElements.canvas, ctx: domElements.ctx, hlCanvas: domElements.hlCanvas, hlCtx: domElements.hlCtx, mediaEl: domElements.mediaEl, atmosphereEl: domElements.atmosphereEl,
             fogRatio: fogRatio, x: 0, y: 0, scale: 1, rotation: 0, volume: 0, visible: true, lockMove: false, lockScale: false,
             isVideo: false, needsRelink: false, filter: 'none'
@@ -747,7 +723,7 @@ try {
     document.getElementById('btn-save-project').onclick = () => {
         for (let s of scenes) {
             for (let l of s.layers) {
-                if (l.imgSrc && l.imgSrc.startsWith('blob:')) { showToast(`Attendi elaborazione background per "${l.name}"`, "error"); return; }
+                if (l.imgSrc && l.imgSrc.startsWith('blob:')) { showToast(`Attendi elaborazione per "${l.name}"`, "error"); return; }
             }
         }
         const customFileName = prompt("Inserisci il nome del salvataggio:", "Campagna_Dnd");
@@ -839,7 +815,6 @@ try {
         reader.readAsText(file);
     });
 
-    // LISTE SCENE (Nuovo stile Card)
     function renderSceneList() {
         sceneListEl.innerHTML = '';
         scenes.forEach(scene => {
@@ -849,14 +824,16 @@ try {
 
             const topRow = document.createElement('div'); topRow.className = 'layer-top-row';
             const nameWrap = document.createElement('div'); nameWrap.className = 'layer-name-wrap';
-            nameWrap.innerText = scene.name;
+            nameWrap.innerHTML = `<span class="material-symbols-rounded">movie</span> ${scene.name}`;
 
             const btns = document.createElement('div'); btns.style.display = 'flex'; btns.style.gap = '6px';
             
-            const btnEdit = document.createElement('button'); btnEdit.className = 'mini-btn'; btnEdit.innerText = '✏️'; 
+            const btnEdit = document.createElement('button'); btnEdit.className = 'mini-btn'; btnEdit.innerHTML = '<span class="material-symbols-rounded">edit</span>'; 
+            btnEdit.title = "Rinomina Scena";
             btnEdit.onclick = (e) => { e.stopPropagation(); renameScene(scene.id); };
             
-            const btnDel = document.createElement('button'); btnDel.className = 'mini-btn danger'; btnDel.innerText = '🗑️'; 
+            const btnDel = document.createElement('button'); btnDel.className = 'mini-btn danger'; btnDel.innerHTML = '<span class="material-symbols-rounded">delete</span>'; 
+            btnDel.title = "Elimina Scena";
             btnDel.onclick = (e) => { e.stopPropagation(); deleteScene(scene.id); };
             
             btns.appendChild(btnEdit);
@@ -868,7 +845,6 @@ try {
         });
     }
 
-    // LISTE LIVELLI (Nuovo stile Card con griglia)
     function renderLayers() {
         const scene = scenes.find(s => s.id === currentSceneId);
         layerListEl.innerHTML = '';
@@ -904,14 +880,17 @@ try {
 
             const topRow = document.createElement('div'); topRow.className = 'layer-top-row';
             const nameWrap = document.createElement('div'); nameWrap.className = 'layer-name-wrap';
-            nameWrap.innerText = layer.name + (layer.ytId ? " 🔴" : (layer.isVideo ? " 🎥" : ""));
+            const iconStr = layer.ytId ? "smart_display" : (layer.isVideo ? "movie" : "image");
+            nameWrap.innerHTML = `<span class="material-symbols-rounded" style="font-size:16px;">${iconStr}</span> ${layer.name}`;
             
             const topBtns = document.createElement('div'); topBtns.style.display = 'flex'; topBtns.style.gap = '6px';
             
-            const btnVis = document.createElement('button'); btnVis.className = `mini-btn ${layer.visible ? '' : 'danger'}`; btnVis.innerText = layer.visible ? '👁️' : '❌'; 
+            const btnVis = document.createElement('button'); btnVis.className = `mini-btn ${layer.visible ? '' : 'danger'}`; 
+            btnVis.innerHTML = `<span class="material-symbols-rounded">${layer.visible ? 'visibility' : 'visibility_off'}</span>`;
             btnVis.title = "Visibilità"; btnVis.onclick = (e) => { e.stopPropagation(); layer.visible = !layer.visible; updateLayerTransform(layer); renderLayers(); };
             
-            const btnDel = document.createElement('button'); btnDel.className = 'mini-btn danger'; btnDel.innerText = '🗑️'; 
+            const btnDel = document.createElement('button'); btnDel.className = 'mini-btn danger'; 
+            btnDel.innerHTML = '<span class="material-symbols-rounded">delete</span>';
             btnDel.onclick = (e) => { 
                 e.stopPropagation();
                 scene.layers = scene.layers.filter(l => l.id !== layer.id); 
@@ -928,7 +907,8 @@ try {
 
             const botRow = document.createElement('div'); botRow.className = 'layer-bottom-grid';
 
-            const btnUp = document.createElement('button'); btnUp.className = 'mini-btn'; btnUp.innerText = '🔼'; btnUp.title = "Sposta Su";
+            const btnUp = document.createElement('button'); btnUp.className = 'mini-btn'; 
+            btnUp.innerHTML = '<span class="material-symbols-rounded">arrow_upward</span>'; btnUp.title = "Sposta Su";
             btnUp.onclick = (e) => { 
                 e.stopPropagation(); 
                 const idx = scene.layers.indexOf(layer);
@@ -940,7 +920,8 @@ try {
                 }
             };
             
-            const btnDown = document.createElement('button'); btnDown.className = 'mini-btn'; btnDown.innerText = '🔽'; btnDown.title = "Sposta Giù";
+            const btnDown = document.createElement('button'); btnDown.className = 'mini-btn'; 
+            btnDown.innerHTML = '<span class="material-symbols-rounded">arrow_downward</span>'; btnDown.title = "Sposta Giù";
             btnDown.onclick = (e) => { 
                 e.stopPropagation(); 
                 const idx = scene.layers.indexOf(layer);
@@ -952,13 +933,17 @@ try {
                 }
             };
 
-            const btnLockMove = document.createElement('button'); btnLockMove.className = `mini-btn ${layer.lockMove ? 'danger' : ''}`; btnLockMove.innerText = layer.lockMove ? '📍' : '✋'; 
+            const btnLockMove = document.createElement('button'); btnLockMove.className = `mini-btn ${layer.lockMove ? 'danger' : ''}`; 
+            btnLockMove.innerHTML = `<span class="material-symbols-rounded">${layer.lockMove ? 'push_pin' : 'drag_pan'}</span>`; 
             btnLockMove.title = "Blocca Movimento"; btnLockMove.onclick = (e) => { e.stopPropagation(); layer.lockMove = !layer.lockMove; renderLayers(); };
 
-            const btnLockScale = document.createElement('button'); btnLockScale.className = `mini-btn ${layer.lockScale ? 'danger' : ''}`; btnLockScale.innerText = layer.lockScale ? '🔒' : '🔎'; 
+            const btnLockScale = document.createElement('button'); btnLockScale.className = `mini-btn ${layer.lockScale ? 'danger' : ''}`; 
+            btnLockScale.innerHTML = `<span class="material-symbols-rounded">${layer.lockScale ? 'zoom_out_map' : 'search'}</span>`; 
             btnLockScale.title = "Blocca Zoom"; btnLockScale.onclick = (e) => { e.stopPropagation(); layer.lockScale = !layer.lockScale; renderLayers(); };
             
-            const btnRename = document.createElement('button'); btnRename.className = 'mini-btn'; btnRename.innerText = '✏️'; btnRename.title = "Rinomina"; btnRename.onclick = (e) => { e.stopPropagation(); renameLayer(layer.id); };
+            const btnRename = document.createElement('button'); btnRename.className = 'mini-btn'; 
+            btnRename.innerHTML = '<span class="material-symbols-rounded">edit</span>'; btnRename.title = "Rinomina Livello"; 
+            btnRename.onclick = (e) => { e.stopPropagation(); renameLayer(layer.id); };
             
             botRow.appendChild(btnUp);
             botRow.appendChild(btnDown);
@@ -970,8 +955,9 @@ try {
             container.appendChild(botRow);
             
             if (layer.needsRelink) {
-                const btnRelink = document.createElement('button'); btnRelink.className = 'btn-relink'; btnRelink.innerText = `🎥 Ricarica Media`;
-                btnRelink.style.borderRadius = "8px"; btnRelink.style.border = "none";
+                const btnRelink = document.createElement('button'); btnRelink.className = 'row-btn btn-warning'; 
+                btnRelink.style.padding = "6px"; btnRelink.style.marginTop = "4px";
+                btnRelink.innerHTML = `<span class="material-symbols-rounded" style="font-size:16px;">sync</span> Ricarica Media`;
                 btnRelink.onclick = (e) => { e.stopPropagation(); layerToRelink = layer; document.getElementById('upload-relink').click(); };
                 container.appendChild(btnRelink);
             }
