@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>D&D Tavolo Proiettore - V36 Final UI</title>
+    <title>D&D Tavolo Proiettore - V37 Contextual UI</title>
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
     <style>
         /* --- RESET E BASE --- */
@@ -48,7 +48,7 @@
             border: 1px solid rgba(255, 255, 255, 0.1);
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
             z-index: 950;
-            transition: opacity 0.3s ease;
+            transition: opacity 0.3s ease, transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
 
         /* TOOLBAR SINISTRA */
@@ -71,19 +71,31 @@
         .tool-btn:active { transform: scale(0.95); }
         .tool-btn.active { background: #0a84ff; box-shadow: 0 0 18px rgba(10, 132, 255, 0.6); outline: 2px solid rgba(255,255,255,0.5); }
 
+        /* NUOVA BARRA CONTESTUALE (Spessore e Colori) */
+        #sub-toolbar {
+            position: absolute; top: 20px; left: 100px; /* Di fianco alla main toolbar */
+            padding: 14px 16px; border-radius: 16px;
+            display: flex; flex-direction: column; gap: 12px; align-items: center;
+            transform-origin: left center;
+        }
+        #sub-toolbar.hidden { transform: scale(0.9) translateX(-10px); }
+
+        .color-swatch { width: 30px; height: 30px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; transition: 0.2s; flex-shrink: 0; }
+        .color-swatch:hover { transform: scale(1.1); }
+        .color-swatch.active { border-color: white; transform: scale(1.2); box-shadow: 0 0 12px currentColor; }
+
+        input[type="range"] { width: 100%; margin: 0; accent-color: #0a84ff; height: 6px; border-radius: 5px; outline: none; }
+
         /* PANNELLO DESTRA */
         #right-panel {
             position: absolute; top: 20px; right: 20px;
             width: 340px; border-radius: 20px; padding: 16px;
             display: flex; flex-direction: column; gap: 10px;
             max-height: calc(100vh - 40px); 
-            overflow-y: auto; 
-            touch-action: pan-y;
-            overscroll-behavior: contain; 
-            scrollbar-width: none; /* Nasconde scrollbar su Firefox */
-            -ms-overflow-style: none; /* Nasconde scrollbar su IE e Edge */
+            overflow-y: auto; touch-action: pan-y; overscroll-behavior: contain; 
+            scrollbar-width: none; -ms-overflow-style: none;
         }
-        #right-panel::-webkit-scrollbar { display: none; /* Nasconde scrollbar su Chrome, Safari e Opera */ }
+        #right-panel::-webkit-scrollbar { display: none; }
 
         /* ACCORDIONS */
         .acc-group { display: flex; flex-direction: column; width: 100%; border-radius: 12px; overflow: hidden; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); flex-shrink: 0;}
@@ -105,19 +117,13 @@
         .btn-danger { background: #ff453a; } .btn-danger:hover { background: #ff3b30; }
 
         label { font-size: 11px; color: #bbb; display: block; margin: 10px 0 6px 0; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;}
-        input[type="range"] { width: 100%; margin: 5px 0 15px 0; accent-color: #0a84ff; height: 6px; border-radius: 5px; outline: none; }
         select { width: 100%; background: rgba(0,0,0,0.4); color: white; border: 1px solid rgba(255,255,255,0.2); padding: 10px; border-radius: 10px; font-size: 14px; outline: none; }
         select option { background: #222; }
 
-        .color-swatch { width: 32px; height: 32px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; transition: 0.2s; flex-shrink: 0; }
-        .color-swatch:hover { transform: scale(1.1); }
-        .color-swatch.active { border-color: white; transform: scale(1.2); box-shadow: 0 0 12px currentColor; }
-
-        /* CARDS (Scene e Layer) CON SCROLL INDIPENDENTE (Scrollbar nascosta) */
+        /* CARDS (Scene e Layer) */
         .list-container { 
             display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; 
-            max-height: 35vh; 
-            overflow-y: auto; overscroll-behavior: contain;
+            max-height: 35vh; overflow-y: auto; overscroll-behavior: contain;
             scrollbar-width: none; -ms-overflow-style: none;
         }
         .list-container::-webkit-scrollbar { display: none; }
@@ -127,7 +133,6 @@
         
         .layer-top-row { display: flex; justify-content: space-between; align-items: center; width: 100%; }
         .layer-name-wrap { flex: 1; font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 10px; display: flex; align-items: center; gap: 6px; }
-        
         .layer-bottom-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; width: 100%; }
 
         .mini-btn { width: 100%; height: 34px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.4); color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
@@ -163,12 +168,14 @@
             #left-toolbar::-webkit-scrollbar { display: none; }
             .toolbar-divider { width: 1px; height: 36px; margin: 0 6px; }
             
-            #right-panel { 
-                top: 15px; right: auto; left: 50%; transform: translateX(-50%); 
-                width: calc(100vw - 30px); 
-                max-height: calc(100vh - 100px); 
-                padding-bottom: 24px; 
+            /* Il sub-toolbar su mobile si posiziona sopra la barra inferiore */
+            #sub-toolbar { 
+                top: auto; bottom: 90px; left: 50%; transform: translateX(-50%); 
+                width: max-content; transform-origin: bottom center;
             }
+            #sub-toolbar.hidden { transform: scale(0.9) translateX(-50%) translateY(10px); }
+            
+            #right-panel { top: 15px; right: auto; left: 50%; transform: translateX(-50%); width: calc(100vw - 30px); max-height: calc(100vh - 100px); padding-bottom: 24px; }
             #reveal-ui { top: 15px; right: 15px; }
         }
     </style>
@@ -208,6 +215,21 @@
     <button id="tool-hl-erase" class="tool-btn" title="Gomma Evidenziatore"><span class="material-symbols-rounded">cleaning_services</span></button>
 </div>
 
+<div id="sub-toolbar" class="glass-panel hidden">
+    <div id="sub-colors" class="row" style="gap: 8px; justify-content: center; margin-bottom: 12px; display: none;">
+        <button class="color-swatch active" data-color="#ff3b30" style="background:#ff3b30;"></button>
+        <button class="color-swatch" data-color="#34c759" style="background:#34c759;"></button>
+        <button class="color-swatch" data-color="#ffcc00" style="background:#ffcc00;"></button>
+        <button class="color-swatch" data-color="#5ac8fa" style="background:#5ac8fa;"></button>
+        <button class="color-swatch" data-color="#ff2d55" style="background:#ff2d55;"></button>
+        <button class="color-swatch" data-color="#ffffff" style="background:#ffffff;"></button>
+    </div>
+    <div class="row" style="gap: 12px; width: 100%;">
+        <span class="material-symbols-rounded" style="font-size: 20px; color: #8e8e93;">line_weight</span>
+        <input type="range" id="brush-size" min="10" max="300" value="80" style="width: 140px;">
+    </div>
+</div>
+
 <div id="right-panel" class="glass-panel">
     
     <div class="row" style="margin-bottom: 4px;">
@@ -233,22 +255,9 @@
     </div>
 
     <div class="acc-group">
-        <button class="acc-btn"><span class="material-symbols-rounded">tune</span> Regolazioni</button>
+        <button class="acc-btn"><span class="material-symbols-rounded">tune</span> Regolazioni Livello</button>
         <div class="acc-content">
-            <label>Colore Evidenziatore:</label>
-            <div class="row" id="hl-color-picker" style="margin-bottom: 15px; justify-content: space-between;">
-                <button class="color-swatch active" data-color="#ff3b30" style="background:#ff3b30;" title="Rosso"></button>
-                <button class="color-swatch" data-color="#34c759" style="background:#34c759;" title="Verde"></button>
-                <button class="color-swatch" data-color="#ffcc00" style="background:#ffcc00;" title="Giallo"></button>
-                <button class="color-swatch" data-color="#5ac8fa" style="background:#5ac8fa;" title="Azzurro"></button>
-                <button class="color-swatch" data-color="#ff2d55" style="background:#ff2d55;" title="Rosa"></button>
-                <button class="color-swatch" data-color="#ffffff" style="background:#ffffff;" title="Bianco"></button>
-            </div>
-
-            <label>Spessore Pennelli:</label>
-            <input type="range" id="brush-size" min="10" max="300" value="80">
-
-            <button id="clear-drawings" class="row-btn btn-danger" style="width:100%; margin: 5px 0 20px 0;"><span class="material-symbols-rounded">delete</span> Pulisci Disegni (Livello)</button>
+            <button id="clear-drawings" class="row-btn btn-danger" style="width:100%; margin-bottom: 20px;"><span class="material-symbols-rounded">delete</span> Pulisci Disegni</button>
 
             <label style="display:flex; justify-content:space-between;">Rotazione: <span id="rot-display" style="color:#ffcc00;">0°</span></label>
             <div class="row">
@@ -307,7 +316,6 @@ const modalCancel = document.getElementById('modal-cancel');
 
 function showCustomModal(text, isPrompt = false, defaultValue = "", callback = null) {
     modalText.innerText = text;
-    
     if(isPrompt) {
         modalInput.style.display = 'block';
         modalInput.value = defaultValue;
@@ -315,43 +323,23 @@ function showCustomModal(text, isPrompt = false, defaultValue = "", callback = n
     } else {
         modalInput.style.display = 'none';
     }
-    
     customModalOverlay.style.display = 'flex';
     
-    modalOk.onclick = null;
-    modalCancel.onclick = null;
-    
-    modalOk.onclick = () => {
-        customModalOverlay.style.display = 'none';
-        if(callback) callback(isPrompt ? modalInput.value : true);
-    };
-    
-    modalCancel.onclick = () => {
-        customModalOverlay.style.display = 'none';
-        if(callback) callback(isPrompt ? null : false);
-    };
+    modalOk.onclick = null; modalCancel.onclick = null;
+    modalOk.onclick = () => { customModalOverlay.style.display = 'none'; if(callback) callback(isPrompt ? modalInput.value : true); };
+    modalCancel.onclick = () => { customModalOverlay.style.display = 'none'; if(callback) callback(isPrompt ? null : false); };
 }
 
-modalInput.addEventListener("keyup", function(event) {
-    if (event.key === "Enter") {
-        event.preventDefault();
-        modalOk.click();
-    }
-});
+modalInput.addEventListener("keyup", function(event) { if (event.key === "Enter") { event.preventDefault(); modalOk.click(); } });
 
 // --- LOGICA ACCORDION ---
 document.querySelectorAll('.acc-btn').forEach(btn => {
     btn.onclick = () => {
         const content = btn.nextElementSibling;
         const isActive = btn.classList.contains('active');
-        
         document.querySelectorAll('.acc-btn').forEach(b => b.classList.remove('active'));
         document.querySelectorAll('.acc-content').forEach(c => c.style.display = 'none');
-        
-        if (!isActive) {
-            btn.classList.add('active');
-            content.style.display = 'block';
-        }
+        if (!isActive) { btn.classList.add('active'); content.style.display = 'block'; }
     };
 });
 
@@ -359,30 +347,18 @@ document.querySelectorAll('.acc-btn').forEach(btn => {
 function showToast(msg, type = 'info') {
     const container = document.getElementById('toast-container');
     const toast = document.createElement('div');
-    toast.className = `toast ${type}`;
-    toast.innerText = msg;
+    toast.className = `toast ${type}`; toast.innerText = msg;
     container.appendChild(toast);
     requestAnimationFrame(() => toast.classList.add('show'));
-    setTimeout(() => {
-        toast.classList.remove('show');
-        setTimeout(() => toast.remove(), 400); 
-    }, 3000);
+    setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 400); }, 3000);
 }
 
-window.onerror = function(msg, url, lineNo) {
-    showToast("ERRORE: " + msg + " (Riga " + lineNo + ")", "error");
-    return false;
-};
+window.onerror = function(msg, url, lineNo) { showToast("ERRORE: " + msg + " (Riga " + lineNo + ")", "error"); return false; };
 
 try {
-    let scenes = [];
-    let currentSceneId = null;
-    let activeLayerId = null; 
-    let sceneCounter = 0;
-    let layerCounter = 0;
-    const MAX_FOG_RES = 1500;
-    let layerToRelink = null;
-    let currentHlColor = '#ff3b30';
+    let scenes = []; let currentSceneId = null; let activeLayerId = null; 
+    let sceneCounter = 0; let layerCounter = 0; const MAX_FOG_RES = 1500;
+    let layerToRelink = null; let currentHlColor = '#ff3b30';
 
     const viewport = document.getElementById('viewport');
     const worldContainer = document.getElementById('world-container');
@@ -395,43 +371,34 @@ try {
     const calibSquare = document.getElementById('calibration-square');
     const rotDisplay = document.getElementById('rot-display');
     const volDisplay = document.getElementById('vol-display');
+    const subToolbar = document.getElementById('sub-toolbar');
+    const subColors = document.getElementById('sub-colors');
 
-    let currentMode = 'camera'; 
-    let isInteracting = false;
-    let startX = 0, startY = 0;
-    let lastPinchDist = null, lastPinchMid = null;
-    let pendingDraw = false;
-    let drawLastX = 0, drawLastY = 0, drawCurrX = 0, drawCurrY = 0;
-    let lastTapTime = 0;
-    let isCinemaMode = false;
-    let pingTimer = null;
+    let currentMode = 'camera'; let isInteracting = false;
+    let startX = 0, startY = 0; let lastPinchDist = null, lastPinchMid = null;
+    let pendingDraw = false; let drawLastX = 0, drawLastY = 0, drawCurrX = 0, drawCurrY = 0;
+    let lastTapTime = 0; let isCinemaMode = false; let pingTimer = null;
 
     function safeBase64ToBlobUrl(b64) {
         if(!b64 || !b64.startsWith('data:')) return b64;
         try {
-            const parts = b64.split(',');
-            const mime = parts[0].match(/:(.*?);/)[1];
-            const bstr = atob(parts[1]);
-            let n = bstr.length;
-            const u8arr = new Uint8Array(n);
+            const parts = b64.split(','); const mime = parts[0].match(/:(.*?);/)[1];
+            const bstr = atob(parts[1]); let n = bstr.length; const u8arr = new Uint8Array(n);
             while(n--){ u8arr[n] = bstr.charCodeAt(n); }
-            const blob = new Blob([u8arr], {type: mime});
-            return URL.createObjectURL(blob);
+            const blob = new Blob([u8arr], {type: mime}); return URL.createObjectURL(blob);
         } catch(e) { return b64; }
     }
 
     function extractYouTubeID(url) {
         const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
-        const match = url.match(regExp);
-        return (match && match[2].length === 11) ? match[2] : null;
+        const match = url.match(regExp); return (match && match[2].length === 11) ? match[2] : null;
     }
 
     function applyLayerVolume(layer) {
         if (!layer || (!layer.isVideo && !layer.ytId)) return;
         const vol = layer.volume || 0;
         if (layer.isVideo && layer.mediaEl) {
-            layer.mediaEl.volume = vol / 100;
-            layer.mediaEl.muted = vol === 0;
+            layer.mediaEl.volume = vol / 100; layer.mediaEl.muted = vol === 0;
         } else if (layer.ytId && layer.mediaEl && layer.mediaEl.contentWindow) {
             if (vol > 0) {
                 layer.mediaEl.contentWindow.postMessage(JSON.stringify({ "event": "command", "func": "unMute", "args": [] }), "*");
@@ -445,65 +412,52 @@ try {
     function applyLayerAtmosphere(layer) {
         if (!layer || !layer.atmosphereEl) return;
         layer.atmosphereEl.className = 'layer-atmosphere'; 
-        if(layer.filter && layer.filter !== 'none') {
-            layer.atmosphereEl.classList.add(`filter-${layer.filter}`);
-        }
+        if(layer.filter && layer.filter !== 'none') layer.atmosphereEl.classList.add(`filter-${layer.filter}`);
+    }
+
+    function renderLayerDrawings(layer) {
+        if (!layer || !layer.svg) return;
+        while (layer.svg.firstChild) layer.svg.removeChild(layer.svg.firstChild);
+        if (!layer.drawings) return;
+        layer.drawings.forEach(path => {
+            const polyline = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+            polyline.setAttribute("fill", "none"); polyline.setAttribute("stroke", path.color);
+            polyline.setAttribute("stroke-width", path.width); polyline.setAttribute("stroke-linecap", "round");
+            polyline.setAttribute("stroke-linejoin", "round"); polyline.setAttribute("opacity", "0.7");
+            polyline.setAttribute("points", path.points.map(p => `${p.x},${p.y}`).join(" "));
+            layer.svg.appendChild(polyline);
+        });
     }
 
     function triggerPing(worldX, worldY) {
-        const ping = document.createElement('div');
-        ping.className = 'ping-marker';
-        ping.style.left = worldX + 'px';
-        ping.style.top = worldY + 'px';
+        const ping = document.createElement('div'); ping.className = 'ping-marker';
+        ping.style.left = worldX + 'px'; ping.style.top = worldY + 'px';
         worldContainer.appendChild(ping);
         setTimeout(() => { if(ping.parentNode) ping.remove(); }, 1500);
     }
 
     function createNewScene() {
         sceneCounter++;
-        const newScene = { 
-            id: sceneCounter, name: `Scena ${sceneCounter}`, layers: [], 
-            panX: 0, panY: 0, scale: 1, cameraLocked: false
-        };
-        scenes.push(newScene);
-        switchScene(newScene.id);
-        renderSceneList();
-        showToast(`Creata ${newScene.name}`, "success");
+        const newScene = { id: sceneCounter, name: `Scena ${sceneCounter}`, layers: [], panX: 0, panY: 0, scale: 1, cameraLocked: false };
+        scenes.push(newScene); switchScene(newScene.id); renderSceneList(); showToast(`Creata ${newScene.name}`, "success");
     }
 
     function switchScene(id) {
         currentSceneId = id; activeLayerId = null; updateToolUI('camera');
-        const scene = scenes.find(s => s.id === id);
-        
-        renderSceneList();
-        
-        Array.from(worldContainer.children).forEach(c => {
-            if(!c.classList.contains('ping-marker')) c.remove();
-        });
-        
+        const scene = scenes.find(s => s.id === id); renderSceneList();
+        Array.from(worldContainer.children).forEach(c => { if(!c.classList.contains('ping-marker')) c.remove(); });
         scene.layers.forEach(layer => { 
-            worldContainer.appendChild(layer.wrapper); 
-            updateLayerTransform(layer); 
-            applyLayerVolume(layer);
-            applyLayerAtmosphere(layer); 
-
-            if (layer.isVideo && layer.mediaEl) {
-                layer.mediaEl.play().catch(err => console.log("Autoplay error:", err));
-            }
+            worldContainer.appendChild(layer.wrapper); updateLayerTransform(layer); 
+            applyLayerVolume(layer); applyLayerAtmosphere(layer); renderLayerDrawings(layer);
+            if (layer.isVideo && layer.mediaEl) layer.mediaEl.play().catch(err => console.log("Autoplay error:", err));
         });
-        
-        applyWorldTransform(scene.panX, scene.panY, scene.scale);
-        updateCameraLockUI(scene);
-        renderLayers();
+        applyWorldTransform(scene.panX, scene.panY, scene.scale); updateCameraLockUI(scene); renderLayers();
     }
 
     function renameScene(id) {
         const scene = scenes.find(s => s.id === id);
         showCustomModal("Inserisci il nuovo nome della scena:", true, scene.name, (newName) => {
-            if (newName && newName.trim() !== "") {
-                scene.name = newName;
-                renderSceneList();
-            }
+            if (newName && newName.trim() !== "") { scene.name = newName; renderSceneList(); }
         });
     }
 
@@ -513,81 +467,45 @@ try {
             if (confirmed) {
                 scene.layers.forEach(l => { if(l.mediaEl) l.mediaEl.src = ""; });
                 scenes = scenes.filter(s => s.id !== id);
-                if (scenes.length === 0) createNewScene();
-                else if (currentSceneId === id) switchScene(scenes[0].id);
-                else renderSceneList();
+                if (scenes.length === 0) createNewScene(); else if (currentSceneId === id) switchScene(scenes[0].id); else renderSceneList();
                 showToast("Scena eliminata.", "error");
             }
         });
     }
 
     function updateCameraLockUI(scene) {
-        if (scene.cameraLocked) {
-            btnLockCamera.innerHTML = '<span class="material-symbols-rounded">lock</span>'; 
-            btnLockCamera.classList.add('color-red');
-        } else {
-            btnLockCamera.innerHTML = '<span class="material-symbols-rounded">lock_open</span>'; 
-            btnLockCamera.classList.remove('color-red');
-        }
+        if (scene.cameraLocked) { btnLockCamera.innerHTML = '<span class="material-symbols-rounded">lock</span>'; btnLockCamera.classList.add('color-red'); } 
+        else { btnLockCamera.innerHTML = '<span class="material-symbols-rounded">lock_open</span>'; btnLockCamera.classList.remove('color-red'); }
     }
 
     function createLayerDOM(mediaSrc, naturalWidth, naturalHeight, fogRatio, existingFogData = null, existingHlData = null, isVideo = false, ytId = null) {
         return new Promise((resolve) => {
             let mediaEl;
-            
             if (ytId) {
-                mediaEl = document.createElement('iframe');
-                let currentOrigin = window.location.origin;
+                mediaEl = document.createElement('iframe'); let currentOrigin = window.location.origin;
                 if (!currentOrigin || currentOrigin === "null" || currentOrigin === "file://") { currentOrigin = "https://www.youtube.com"; }
                 mediaEl.src = `https://www.youtube.com/embed/${ytId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${ytId}&playsinline=1&modestbranding=1&origin=${currentOrigin}&enablejsapi=1`;
-                mediaEl.allow = "autoplay; encrypted-media";
-                mediaEl.setAttribute("referrerpolicy", "strict-origin-when-cross-origin");
-                mediaEl.style.backgroundColor = "#000";
+                mediaEl.allow = "autoplay; encrypted-media"; mediaEl.setAttribute("referrerpolicy", "strict-origin-when-cross-origin"); mediaEl.style.backgroundColor = "#000";
             } else if (isVideo) {
-                mediaEl = document.createElement('video');
-                mediaEl.autoplay = true; mediaEl.loop = true; mediaEl.muted = true; mediaEl.playsInline = true;
-                mediaEl.style.backgroundColor = "#222"; 
-                mediaEl.addEventListener('timeupdate', function() {
-                    if (this.duration && this.currentTime >= this.duration - 0.15) { this.currentTime = 0; this.play(); }
-                });
+                mediaEl = document.createElement('video'); mediaEl.autoplay = true; mediaEl.loop = true; mediaEl.muted = true; mediaEl.playsInline = true; mediaEl.style.backgroundColor = "#222"; 
+                mediaEl.addEventListener('timeupdate', function() { if (this.duration && this.currentTime >= this.duration - 0.15) { this.currentTime = 0; this.play(); } });
                 if (mediaSrc) { mediaEl.src = mediaSrc; mediaEl.load(); } 
-            } else {
-                mediaEl = new Image();
-                if (mediaSrc) { mediaEl.src = mediaSrc; } 
-            }
+            } else { mediaEl = new Image(); if (mediaSrc) { mediaEl.src = mediaSrc; } }
 
-            const wrapper = document.createElement('div');
-            wrapper.className = 'layer-wrapper';
-            wrapper.style.width = naturalWidth + 'px'; 
-            wrapper.style.height = naturalHeight + 'px';
-            mediaEl.className = 'layer-img'; 
-            wrapper.appendChild(mediaEl);
+            const wrapper = document.createElement('div'); wrapper.className = 'layer-wrapper'; wrapper.style.width = naturalWidth + 'px'; wrapper.style.height = naturalHeight + 'px';
+            mediaEl.className = 'layer-img'; wrapper.appendChild(mediaEl);
+            const atmosphere = document.createElement('div'); atmosphere.className = 'layer-atmosphere'; wrapper.appendChild(atmosphere);
             
-            const atmosphere = document.createElement('div');
-            atmosphere.className = 'layer-atmosphere';
-            wrapper.appendChild(atmosphere);
-            
-            const canvas = document.createElement('canvas');
-            canvas.className = 'fog-canvas';
-            canvas.width = naturalWidth * fogRatio; 
-            canvas.height = naturalHeight * fogRatio;
-            const ctx = canvas.getContext('2d');
-            wrapper.appendChild(canvas);
-
-            const hlCanvas = document.createElement('canvas');
-            hlCanvas.className = 'hl-canvas';
-            hlCanvas.width = naturalWidth * fogRatio; 
-            hlCanvas.height = naturalHeight * fogRatio;
-            const hlCtx = hlCanvas.getContext('2d');
-            wrapper.appendChild(hlCanvas);
+            const canvas = document.createElement('canvas'); canvas.className = 'fog-canvas'; canvas.width = naturalWidth * fogRatio; canvas.height = naturalHeight * fogRatio;
+            const ctx = canvas.getContext('2d'); wrapper.appendChild(canvas);
+            const hlCanvas = document.createElement('canvas'); hlCanvas.className = 'hl-canvas'; hlCanvas.width = naturalWidth * fogRatio; hlCanvas.height = naturalHeight * fogRatio;
+            const hlCtx = hlCanvas.getContext('2d'); wrapper.appendChild(hlCanvas);
 
             let fogPromise = existingFogData ? new Promise(r => { let img = new Image(); img.onload = () => { ctx.drawImage(img, 0, 0); r(); }; img.src = existingFogData; }) : Promise.resolve();
             let hlPromise = existingHlData ? new Promise(r => { let img = new Image(); img.onload = () => { hlCtx.drawImage(img, 0, 0); r(); }; img.src = existingHlData; }) : Promise.resolve();
             let mediaPromise = (!ytId && mediaSrc) ? new Promise(r => { if(isVideo) { mediaEl.onloadeddata = r; } else { mediaEl.onload = r; } }) : Promise.resolve();
 
-            Promise.all([fogPromise, hlPromise, mediaPromise]).then(() => {
-                resolve({ wrapper, canvas, ctx, hlCanvas, hlCtx, mediaEl, atmosphereEl: atmosphere });
-            });
+            Promise.all([fogPromise, hlPromise, mediaPromise]).then(() => { resolve({ wrapper, canvas, ctx, hlCanvas, hlCtx, mediaEl, atmosphereEl: atmosphere }); });
         });
     }
 
@@ -595,208 +513,113 @@ try {
         if (scene.layers.length === 0) {
             const scaleFit = Math.min(window.innerWidth / nWidth, window.innerHeight / nHeight);
             scene.scale = scaleFit < 1 ? scaleFit : 1;
-            scene.panX = (window.innerWidth - (nWidth * scene.scale)) / 2;
-            scene.panY = (window.innerHeight - (nHeight * scene.scale)) / 2;
+            scene.panX = (window.innerWidth - (nWidth * scene.scale)) / 2; scene.panY = (window.innerHeight - (nHeight * scene.scale)) / 2;
             applyWorldTransform(scene.panX, scene.panY, scene.scale);
         }
-
-        scene.layers.push(newLayer);
-        activeLayerId = newLayer.id; 
-        updateToolUI('layer');
-        worldContainer.appendChild(newLayer.wrapper);
-        
-        scene.layers.forEach(l => updateLayerTransform(l));
-        renderLayers();
-        applyLayerAtmosphere(newLayer);
-        showToast("Livello aggiunto!", "success");
+        scene.layers.push(newLayer); activeLayerId = newLayer.id; updateToolUI('layer');
+        worldContainer.appendChild(newLayer.wrapper); scene.layers.forEach(l => updateLayerTransform(l));
+        renderLayers(); applyLayerAtmosphere(newLayer); showToast("Livello aggiunto!", "success");
     }
 
     function updateLayerTransform(layer) {
-        const rot = layer.rotation || 0;
-        layer.wrapper.style.transform = `translate(${layer.x}px, ${layer.y}px) scale(${layer.scale}) rotate(${rot}deg)`;
+        const rot = layer.rotation || 0; layer.wrapper.style.transform = `translate(${layer.x}px, ${layer.y}px) scale(${layer.scale}) rotate(${rot}deg)`;
         layer.wrapper.style.display = layer.visible ? 'block' : 'none';
-        
-        const scene = scenes.find(s => s.id === currentSceneId);
-        if (scene) {
-            layer.wrapper.style.zIndex = scene.layers.indexOf(layer);
-        }
+        const scene = scenes.find(s => s.id === currentSceneId); if (scene) { layer.wrapper.style.zIndex = scene.layers.indexOf(layer); }
     }
 
     function renameLayer(id) {
-        const scene = scenes.find(s => s.id === currentSceneId);
-        const layer = scene.layers.find(l => l.id === id);
+        const scene = scenes.find(s => s.id === currentSceneId); const layer = scene.layers.find(l => l.id === id);
         showCustomModal("Inserisci il nuovo nome del livello:", true, layer.name, (newName) => {
-            if (newName && newName.trim() !== "") {
-                layer.name = newName;
-                renderLayers();
-            }
+            if (newName && newName.trim() !== "") { layer.name = newName; renderLayers(); }
         });
     }
 
     // --- EVENT LISTENERS UI ---
-
     document.querySelectorAll('.color-swatch').forEach(btn => {
         btn.onclick = () => {
             document.querySelectorAll('.color-swatch').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            currentHlColor = btn.dataset.color;
-            updateToolUI('hl-draw'); 
+            btn.classList.add('active'); currentHlColor = btn.dataset.color; updateToolUI('hl-draw'); 
         };
     });
 
     document.getElementById('atmosphere-select').onchange = (e) => {
-        const scene = scenes.find(s => s.id === currentSceneId);
-        const layer = scene?.layers.find(l => l.id === activeLayerId);
-        if(layer) { 
-            layer.filter = e.target.value; 
-            applyLayerAtmosphere(layer); 
-        } else {
-            showToast("Seleziona prima un livello.", "error");
-            e.target.value = 'none';
-        }
+        const scene = scenes.find(s => s.id === currentSceneId); const layer = scene?.layers.find(l => l.id === activeLayerId);
+        if(layer) { layer.filter = e.target.value; applyLayerAtmosphere(layer); } 
+        else { showToast("Seleziona prima un livello.", "error"); e.target.value = 'none'; }
     };
     
     document.getElementById('clear-drawings').onclick = () => {
-        const scene = scenes.find(s => s.id === currentSceneId);
-        const layer = scene?.layers.find(l => l.id === activeLayerId);
-        if(layer) { 
-            layer.hlCtx.clearRect(0, 0, layer.hlCanvas.width, layer.hlCanvas.height); 
-            showToast("Disegni rimossi dal livello.", "success");
-        } else {
-            showToast("Seleziona un livello da pulire.", "error");
-        }
+        const scene = scenes.find(s => s.id === currentSceneId); const layer = scene?.layers.find(l => l.id === activeLayerId);
+        if(layer) { layer.hlCtx.clearRect(0, 0, layer.hlCanvas.width, layer.hlCanvas.height); showToast("Disegni rimossi dal livello.", "success"); } 
+        else { showToast("Seleziona un livello da pulire.", "error"); }
     };
 
     document.getElementById('btn-upload-trigger').onclick = () => document.getElementById('upload-layer').click();
 
     document.getElementById('btn-yt-layer').onclick = () => {
         showCustomModal("Incolla qui il link del video di YouTube:", true, "", async (url) => {
-            if (!url) return;
-            const ytId = extractYouTubeID(url);
+            if (!url) return; const ytId = extractYouTubeID(url);
             if (!ytId) { showToast("Link non valido!", "error"); return; }
-
-            const scene = scenes.find(s => s.id === currentSceneId);
-            if (!scene) return;
-
-            loadingOverlay.style.display = 'flex';
-            const nWidth = 1920; const nHeight = 1080;
-            const fogRatio = MAX_FOG_RES / Math.max(nWidth, nHeight);
-
+            const scene = scenes.find(s => s.id === currentSceneId); if (!scene) return;
+            loadingOverlay.style.display = 'flex'; const nWidth = 1920; const nHeight = 1080; const fogRatio = MAX_FOG_RES / Math.max(nWidth, nHeight);
             const domElements = await createLayerDOM(null, nWidth, nHeight, fogRatio, null, null, false, ytId);
-
             layerCounter++;
             const newLayer = {
-                id: layerCounter, name: `Mappa YouTube`, fileName: `YT: ${ytId}`, imgSrc: null, ytId: ytId, 
-                nWidth: nWidth, nHeight: nHeight, wrapper: domElements.wrapper, canvas: domElements.canvas, ctx: domElements.ctx, hlCanvas: domElements.hlCanvas, hlCtx: domElements.hlCtx, mediaEl: domElements.mediaEl, atmosphereEl: domElements.atmosphereEl,
-                fogRatio: fogRatio, x: 0, y: 0, scale: 1, rotation: 0, volume: 0, visible: true, lockMove: false, lockScale: false,
-                isVideo: false, needsRelink: false, filter: 'none'
+                id: layerCounter, name: `Mappa YouTube`, fileName: `YT: ${ytId}`, imgSrc: null, ytId: ytId, nWidth: nWidth, nHeight: nHeight, 
+                wrapper: domElements.wrapper, canvas: domElements.canvas, ctx: domElements.ctx, hlCanvas: domElements.hlCanvas, hlCtx: domElements.hlCtx, mediaEl: domElements.mediaEl, atmosphereEl: domElements.atmosphereEl,
+                fogRatio: fogRatio, x: 0, y: 0, scale: 1, rotation: 0, volume: 0, visible: true, lockMove: false, lockScale: false, isVideo: false, needsRelink: false, filter: 'none'
             };
-            
-            finalizeLayerAddition(scene, newLayer, nWidth, nHeight);
-            loadingOverlay.style.display = 'none';
+            finalizeLayerAddition(scene, newLayer, nWidth, nHeight); loadingOverlay.style.display = 'none';
         });
     };
 
     document.getElementById('upload-layer').addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        const scene = scenes.find(s => s.id === currentSceneId);
-        if (!file || !scene) return;
-        
-        const isVideo = file.type.startsWith('video/');
-        const objectUrl = URL.createObjectURL(file);
-        loadingOverlay.style.display = 'flex';
+        const file = e.target.files[0]; const scene = scenes.find(s => s.id === currentSceneId); if (!file || !scene) return;
+        const isVideo = file.type.startsWith('video/'); const objectUrl = URL.createObjectURL(file); loadingOverlay.style.display = 'flex';
         
         const processMedia = async (nWidth, nHeight) => {
             const fogRatio = Math.max(nWidth, nHeight) > MAX_FOG_RES ? MAX_FOG_RES / Math.max(nWidth, nHeight) : 1;
             const domElements = await createLayerDOM(objectUrl, nWidth, nHeight, fogRatio, null, null, isVideo);
-
             layerCounter++;
             const newLayer = {
-                id: layerCounter, name: `Livello ${scene.layers.length + 1}`, fileName: file.name, imgSrc: isVideo ? null : objectUrl, ytId: null,
-                nWidth: nWidth, nHeight: nHeight, wrapper: domElements.wrapper, canvas: domElements.canvas, ctx: domElements.ctx, hlCanvas: domElements.hlCanvas, hlCtx: domElements.hlCtx, mediaEl: domElements.mediaEl, atmosphereEl: domElements.atmosphereEl,
-                fogRatio: fogRatio, x: 0, y: 0, scale: 1, rotation: 0, volume: 0, visible: true, lockMove: false, lockScale: false,
-                isVideo: isVideo, needsRelink: false, filter: 'none'
+                id: layerCounter, name: `Livello ${scene.layers.length + 1}`, fileName: file.name, imgSrc: isVideo ? null : objectUrl, ytId: null, nWidth: nWidth, nHeight: nHeight, 
+                wrapper: domElements.wrapper, canvas: domElements.canvas, ctx: domElements.ctx, hlCanvas: domElements.hlCanvas, hlCtx: domElements.hlCtx, mediaEl: domElements.mediaEl, atmosphereEl: domElements.atmosphereEl,
+                fogRatio: fogRatio, x: 0, y: 0, scale: 1, rotation: 0, volume: 0, visible: true, lockMove: false, lockScale: false, isVideo: isVideo, needsRelink: false, filter: 'none'
             };
-            
-            finalizeLayerAddition(scene, newLayer, nWidth, nHeight);
-            loadingOverlay.style.display = 'none';
-            e.target.value = '';
-
-            if (!isVideo) {
-                const reader = new FileReader();
-                reader.onload = (ev) => { newLayer.imgSrc = ev.target.result; };
-                reader.readAsDataURL(file);
-            }
+            finalizeLayerAddition(scene, newLayer, nWidth, nHeight); loadingOverlay.style.display = 'none'; e.target.value = '';
+            if (!isVideo) { const reader = new FileReader(); reader.onload = (ev) => { newLayer.imgSrc = ev.target.result; }; reader.readAsDataURL(file); }
         };
 
-        if (isVideo) {
-            const tempVid = document.createElement('video');
-            tempVid.onloadedmetadata = () => { processMedia(tempVid.videoWidth, tempVid.videoHeight); };
-            tempVid.src = objectUrl;
-        } else {
-            const tempImg = new Image();
-            tempImg.onload = () => { processMedia(tempImg.naturalWidth, tempImg.naturalHeight); };
-            tempImg.src = objectUrl;
-        }
+        if (isVideo) { const tempVid = document.createElement('video'); tempVid.onloadedmetadata = () => { processMedia(tempVid.videoWidth, tempVid.videoHeight); }; tempVid.src = objectUrl; } 
+        else { const tempImg = new Image(); tempImg.onload = () => { processMedia(tempImg.naturalWidth, tempImg.naturalHeight); }; tempImg.src = objectUrl; }
     });
 
     rotSlider.addEventListener('input', (e) => {
-        const scene = scenes.find(s => s.id === currentSceneId);
-        const layer = scene?.layers.find(l => l.id === activeLayerId);
-        if(layer) {
-            layer.rotation = parseFloat(e.target.value);
-            rotDisplay.innerText = layer.rotation + "°";
-            updateLayerTransform(layer);
-        }
+        const scene = scenes.find(s => s.id === currentSceneId); const layer = scene?.layers.find(l => l.id === activeLayerId);
+        if(layer) { layer.rotation = parseFloat(e.target.value); rotDisplay.innerText = layer.rotation + "°"; updateLayerTransform(layer); }
     });
 
     document.getElementById('btn-reset-rot').onclick = () => {
-        const scene = scenes.find(s => s.id === currentSceneId);
-        const layer = scene?.layers.find(l => l.id === activeLayerId);
-        if(layer) {
-            layer.rotation = 0;
-            rotSlider.value = 0;
-            rotDisplay.innerText = "0°";
-            updateLayerTransform(layer);
-        }
+        const scene = scenes.find(s => s.id === currentSceneId); const layer = scene?.layers.find(l => l.id === activeLayerId);
+        if(layer) { layer.rotation = 0; rotSlider.value = 0; rotDisplay.innerText = "0°"; updateLayerTransform(layer); }
     };
 
     volSlider.addEventListener('input', (e) => {
-        const scene = scenes.find(s => s.id === currentSceneId);
-        const layer = scene?.layers.find(l => l.id === activeLayerId);
-        if(layer && (layer.isVideo || layer.ytId)) {
-            layer.volume = parseInt(e.target.value);
-            volDisplay.innerText = layer.volume + "%";
-            applyLayerVolume(layer);
-        }
+        const scene = scenes.find(s => s.id === currentSceneId); const layer = scene?.layers.find(l => l.id === activeLayerId);
+        if(layer && (layer.isVideo || layer.ytId)) { layer.volume = parseInt(e.target.value); volDisplay.innerText = layer.volume + "%"; applyLayerVolume(layer); }
     });
 
     document.getElementById('upload-relink').addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        if (!file || !layerToRelink) return;
-        const objectUrl = URL.createObjectURL(file);
-        layerToRelink.mediaEl.src = objectUrl;
-        layerToRelink.mediaEl.load();
-        layerToRelink.needsRelink = false; 
-        setTimeout(() => applyLayerVolume(layerToRelink), 500);
-        layerToRelink = null;
-        renderLayers();
-        e.target.value = '';
+        const file = e.target.files[0]; if (!file || !layerToRelink) return;
+        const objectUrl = URL.createObjectURL(file); layerToRelink.mediaEl.src = objectUrl; layerToRelink.mediaEl.load(); layerToRelink.needsRelink = false; 
+        setTimeout(() => applyLayerVolume(layerToRelink), 500); layerToRelink = null; renderLayers(); e.target.value = '';
     });
 
     document.getElementById('btn-save-project').onclick = () => {
-        for (let s of scenes) {
-            for (let l of s.layers) {
-                if (l.imgSrc && l.imgSrc.startsWith('blob:')) { showToast(`Attendi elaborazione per "${l.name}"`, "error"); return; }
-            }
-        }
-        
+        for (let s of scenes) { for (let l of s.layers) { if (l.imgSrc && l.imgSrc.startsWith('blob:')) { showToast(`Attendi elaborazione per "${l.name}"`, "error"); return; } } }
         showCustomModal("Inserisci il nome del salvataggio:", true, "Campagna_Dnd", (customFileName) => {
             if (!customFileName || customFileName.trim() === "") return; 
-
-            loadingOverlay.style.display = 'flex';
-            document.getElementById('loading-text').innerText = "Salvataggio in corso...";
-            
+            loadingOverlay.style.display = 'flex'; document.getElementById('loading-text').innerText = "Salvataggio in corso...";
             setTimeout(() => {
                 try {
                     const projectData = {
@@ -804,19 +627,14 @@ try {
                         scenes: scenes.map(scene => ({
                             id: scene.id, name: scene.name, panX: scene.panX, panY: scene.panY, scale: scene.scale, cameraLocked: scene.cameraLocked || false,
                             layers: scene.layers.map(layer => ({
-                                id: layer.id, name: layer.name, fileName: layer.fileName || "Media",
-                                imgSrc: layer.imgSrc, ytId: layer.ytId || null, nWidth: layer.nWidth, nHeight: layer.nHeight, fogRatio: layer.fogRatio,
+                                id: layer.id, name: layer.name, fileName: layer.fileName || "Media", imgSrc: layer.imgSrc, ytId: layer.ytId || null, nWidth: layer.nWidth, nHeight: layer.nHeight, fogRatio: layer.fogRatio,
                                 fogData: layer.canvas.toDataURL(), hlData: layer.hlCanvas.toDataURL(), x: layer.x, y: layer.y, scale: layer.scale, rotation: layer.rotation || 0, volume: layer.volume || 0,
-                                visible: layer.visible, lockMove: layer.lockMove, lockScale: layer.lockScale, isVideo: layer.isVideo || false,
-                                filter: layer.filter || 'none'
+                                visible: layer.visible, lockMove: layer.lockMove, lockScale: layer.lockScale, isVideo: layer.isVideo || false, filter: layer.filter || 'none'
                             }))
                         }))
                     };
-                    const blob = new Blob([JSON.stringify(projectData)], { type: "application/json" });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a'); a.href = url;
-                    a.download = customFileName.endsWith('.json') ? customFileName : customFileName + ".json";
-                    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+                    const blob = new Blob([JSON.stringify(projectData)], { type: "application/json" }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url;
+                    a.download = customFileName.endsWith('.json') ? customFileName : customFileName + ".json"; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
                     showToast("Progetto salvato con successo!", "success");
                 } catch (error) { showToast("Errore durante il salvataggio.", "error"); }
                 loadingOverlay.style.display = 'none';
@@ -827,54 +645,31 @@ try {
     document.getElementById('btn-load-trigger').onclick = () => document.getElementById('upload-project').click();
 
     document.getElementById('upload-project').addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
+        const file = e.target.files[0]; if (!file) return;
         loadingOverlay.style.display = 'flex'; document.getElementById('loading-text').innerText = "Caricamento mappa...";
-        
         const reader = new FileReader();
         reader.onload = async (event) => {
             try {
-                await new Promise(resolve => setTimeout(resolve, 50));
-                const data = JSON.parse(event.target.result);
+                await new Promise(resolve => setTimeout(resolve, 50)); const data = JSON.parse(event.target.result);
                 scenes = []; worldContainer.innerHTML = ''; sceneCounter = data.sceneCounter; layerCounter = data.layerCounter;
-                
-                const base64ToBlobUrl = async (b64) => {
-                    if(!b64 || !b64.startsWith('data:')) return b64;
-                    const res = await fetch(b64); const blob = await res.blob(); return URL.createObjectURL(blob);
-                };
-
+                const base64ToBlobUrl = async (b64) => { if(!b64 || !b64.startsWith('data:')) return b64; const res = await fetch(b64); const blob = await res.blob(); return URL.createObjectURL(blob); };
                 for (const sceneData of data.scenes) {
-                    const newScene = {
-                        id: sceneData.id, name: sceneData.name, panX: sceneData.panX, panY: sceneData.panY, scale: sceneData.scale, cameraLocked: sceneData.cameraLocked || false,
-                        layers: []
-                    };
-
+                    const newScene = { id: sceneData.id, name: sceneData.name, panX: sceneData.panX, panY: sceneData.panY, scale: sceneData.scale, cameraLocked: sceneData.cameraLocked || false, layers: [] };
                     for (const layerData of sceneData.layers) {
-                        const isVid = layerData.isVideo || false; const ytId = layerData.ytId || null;
-                        const needsRelink = isVid && !layerData.imgSrc && !ytId; 
-                        const domSrc = safeBase64ToBlobUrl(layerData.imgSrc);
-                        const domFog = layerData.fogData ? safeBase64ToBlobUrl(layerData.fogData) : null;
-                        const domHl = layerData.hlData ? safeBase64ToBlobUrl(layerData.hlData) : null;
-
+                        const isVid = layerData.isVideo || false; const ytId = layerData.ytId || null; const needsRelink = isVid && !layerData.imgSrc && !ytId; 
+                        const domSrc = safeBase64ToBlobUrl(layerData.imgSrc); const domFog = layerData.fogData ? safeBase64ToBlobUrl(layerData.fogData) : null; const domHl = layerData.hlData ? safeBase64ToBlobUrl(layerData.hlData) : null;
                         const domElements = await createLayerDOM(domSrc, layerData.nWidth, layerData.nHeight, layerData.fogRatio, domFog, domHl, isVid, ytId);
-                        
                         const createdLayer = {
-                            id: layerData.id, name: layerData.name, fileName: layerData.fileName,
-                            imgSrc: layerData.imgSrc, ytId: ytId, nWidth: layerData.nWidth, nHeight: layerData.nHeight, fogRatio: layerData.fogRatio,
+                            id: layerData.id, name: layerData.name, fileName: layerData.fileName, imgSrc: layerData.imgSrc, ytId: ytId, nWidth: layerData.nWidth, nHeight: layerData.nHeight, fogRatio: layerData.fogRatio,
                             wrapper: domElements.wrapper, canvas: domElements.canvas, ctx: domElements.ctx, hlCanvas: domElements.hlCanvas, hlCtx: domElements.hlCtx, mediaEl: domElements.mediaEl, atmosphereEl: domElements.atmosphereEl,
-                            x: layerData.x, y: layerData.y, scale: layerData.scale, rotation: layerData.rotation || 0, volume: layerData.volume || 0,
-                            visible: layerData.visible, lockMove: layerData.lockMove || false, lockScale: layerData.lockScale || false,
+                            x: layerData.x, y: layerData.y, scale: layerData.scale, rotation: layerData.rotation || 0, volume: layerData.volume || 0, visible: layerData.visible, lockMove: layerData.lockMove || false, lockScale: layerData.lockScale || false,
                             isVideo: isVid, needsRelink: needsRelink, filter: layerData.filter || 'none'
                         };
-                        newScene.layers.push(createdLayer);
-                        applyLayerAtmosphere(createdLayer);
-                        setTimeout(() => applyLayerVolume(createdLayer), 1500);
+                        newScene.layers.push(createdLayer); applyLayerAtmosphere(createdLayer); setTimeout(() => applyLayerVolume(createdLayer), 1500);
                     }
                     scenes.push(newScene);
                 }
-                if (scenes.length > 0) switchScene(scenes[0].id);
-                showToast("Campagna caricata con successo!", "success");
-
+                if (scenes.length > 0) switchScene(scenes[0].id); showToast("Campagna caricata con successo!", "success");
             } catch (error) { showToast("Errore: File non valido.", "error"); console.error(error); }
             loadingOverlay.style.display = 'none'; e.target.value = '';
         };
@@ -884,208 +679,90 @@ try {
     function renderSceneList() {
         sceneListEl.innerHTML = '';
         scenes.forEach(scene => {
-            const container = document.createElement('div');
-            container.className = `scene-item ${scene.id === currentSceneId ? 'active' : ''}`;
-            container.onclick = () => switchScene(scene.id);
-
+            const container = document.createElement('div'); container.className = `scene-item ${scene.id === currentSceneId ? 'active' : ''}`; container.onclick = () => switchScene(scene.id);
             const topRow = document.createElement('div'); topRow.className = 'layer-top-row';
-            const nameWrap = document.createElement('div'); nameWrap.className = 'layer-name-wrap';
-            nameWrap.innerHTML = `<span class="material-symbols-rounded">movie</span> ${scene.name}`;
-
+            const nameWrap = document.createElement('div'); nameWrap.className = 'layer-name-wrap'; nameWrap.innerHTML = `<span class="material-symbols-rounded">movie</span> ${scene.name}`;
             const btns = document.createElement('div'); btns.style.display = 'flex'; btns.style.gap = '6px';
-            
-            const btnEdit = document.createElement('button'); btnEdit.className = 'mini-btn'; btnEdit.innerHTML = '<span class="material-symbols-rounded">edit</span>'; 
-            btnEdit.title = "Rinomina Scena";
-            btnEdit.onclick = (e) => { e.stopPropagation(); renameScene(scene.id); };
-            
-            const btnDel = document.createElement('button'); btnDel.className = 'mini-btn danger'; btnDel.innerHTML = '<span class="material-symbols-rounded">delete</span>'; 
-            btnDel.title = "Elimina Scena";
-            btnDel.onclick = (e) => { e.stopPropagation(); deleteScene(scene.id); };
-            
-            btns.appendChild(btnEdit);
-            btns.appendChild(btnDel);
-            topRow.appendChild(nameWrap);
-            topRow.appendChild(btns);
-            container.appendChild(topRow);
-            sceneListEl.appendChild(container);
+            const btnEdit = document.createElement('button'); btnEdit.className = 'mini-btn'; btnEdit.innerHTML = '<span class="material-symbols-rounded">edit</span>'; btnEdit.title = "Rinomina Scena"; btnEdit.onclick = (e) => { e.stopPropagation(); renameScene(scene.id); };
+            const btnDel = document.createElement('button'); btnDel.className = 'mini-btn danger'; btnDel.innerHTML = '<span class="material-symbols-rounded">delete</span>'; btnDel.title = "Elimina Scena"; btnDel.onclick = (e) => { e.stopPropagation(); deleteScene(scene.id); };
+            btns.appendChild(btnEdit); btns.appendChild(btnDel); topRow.appendChild(nameWrap); topRow.appendChild(btns); container.appendChild(topRow); sceneListEl.appendChild(container);
         });
     }
 
     function renderLayers() {
         const scene = scenes.find(s => s.id === currentSceneId);
         layerListEl.innerHTML = '';
-        
-        if (!scene) {
-            rotSlider.value = 0; rotDisplay.innerText = "0°";
-            volSlider.value = 0; volDisplay.innerText = "0%"; volSlider.disabled = true; 
-            document.getElementById('atmosphere-select').value = 'none';
-            return;
-        }
-
+        if (!scene) { rotSlider.value = 0; rotDisplay.innerText = "0°"; volSlider.value = 0; volDisplay.innerText = "0%"; volSlider.disabled = true; document.getElementById('atmosphere-select').value = 'none'; return; }
         if (activeLayerId) {
             const activeL = scene.layers.find(l => l.id === activeLayerId);
             if (activeL) {
-                rotSlider.value = activeL.rotation || 0; rotDisplay.innerText = (activeL.rotation || 0) + "°";
-                document.getElementById('atmosphere-select').value = activeL.filter || 'none';
-                if(activeL.isVideo || activeL.ytId) {
-                    volSlider.disabled = false; volSlider.value = activeL.volume || 0; volDisplay.innerText = (activeL.volume || 0) + "%";
-                } else {
-                    volSlider.disabled = true; volSlider.value = 0; volDisplay.innerText = "0%";
-                }
+                rotSlider.value = activeL.rotation || 0; rotDisplay.innerText = (activeL.rotation || 0) + "°"; document.getElementById('atmosphere-select').value = activeL.filter || 'none';
+                if(activeL.isVideo || activeL.ytId) { volSlider.disabled = false; volSlider.value = activeL.volume || 0; volDisplay.innerText = (activeL.volume || 0) + "%"; } 
+                else { volSlider.disabled = true; volSlider.value = 0; volDisplay.innerText = "0%"; }
             }
-        } else {
-            rotSlider.value = 0; rotDisplay.innerText = "0°";
-            volSlider.value = 0; volDisplay.innerText = "0%"; volSlider.disabled = true;
-            document.getElementById('atmosphere-select').value = 'none';
-        }
+        } else { rotSlider.value = 0; rotDisplay.innerText = "0°"; volSlider.value = 0; volDisplay.innerText = "0%"; volSlider.disabled = true; document.getElementById('atmosphere-select').value = 'none'; }
 
         [...scene.layers].reverse().forEach(layer => {
-            const container = document.createElement('div'); 
-            container.className = `layer-item-container ${layer.id === activeLayerId ? 'active' : ''}`;
-            container.onclick = () => { activeLayerId = layer.id; if(currentMode === 'camera') updateToolUI('layer'); else renderLayers(); };
-
+            const container = document.createElement('div'); container.className = `layer-item-container ${layer.id === activeLayerId ? 'active' : ''}`; container.onclick = () => { activeLayerId = layer.id; if(currentMode === 'camera') updateToolUI('layer'); else renderLayers(); };
             const topRow = document.createElement('div'); topRow.className = 'layer-top-row';
-            const nameWrap = document.createElement('div'); nameWrap.className = 'layer-name-wrap';
-            const iconStr = layer.ytId ? "smart_display" : (layer.isVideo ? "movie" : "image");
-            nameWrap.innerHTML = `<span class="material-symbols-rounded" style="font-size:16px;">${iconStr}</span> ${layer.name}`;
-            
+            const nameWrap = document.createElement('div'); nameWrap.className = 'layer-name-wrap'; const iconStr = layer.ytId ? "smart_display" : (layer.isVideo ? "movie" : "image"); nameWrap.innerHTML = `<span class="material-symbols-rounded" style="font-size:16px;">${iconStr}</span> ${layer.name}`;
             const topBtns = document.createElement('div'); topBtns.style.display = 'flex'; topBtns.style.gap = '6px';
-            
-            const btnVis = document.createElement('button'); btnVis.className = `mini-btn ${layer.visible ? '' : 'danger'}`; 
-            btnVis.innerHTML = `<span class="material-symbols-rounded">${layer.visible ? 'visibility' : 'visibility_off'}</span>`;
-            btnVis.title = "Visibilità"; btnVis.onclick = (e) => { e.stopPropagation(); layer.visible = !layer.visible; updateLayerTransform(layer); renderLayers(); };
-            
-            const btnDel = document.createElement('button'); btnDel.className = 'mini-btn danger'; 
-            btnDel.innerHTML = '<span class="material-symbols-rounded">delete</span>';
-            btnDel.onclick = (e) => { 
-                e.stopPropagation();
-                showCustomModal(`Eliminare il livello "${layer.name}"?`, false, null, (yes) => {
-                    if(yes) {
-                        scene.layers = scene.layers.filter(l => l.id !== layer.id); 
-                        if (activeLayerId === layer.id) activeLayerId = null; 
-                        layer.wrapper.remove(); 
-                        scene.layers.forEach(l => updateLayerTransform(l));
-                        renderLayers(); 
-                    }
-                });
-            };
-
-            topBtns.appendChild(btnVis);
-            topBtns.appendChild(btnDel);
-            topRow.appendChild(nameWrap);
-            topRow.appendChild(topBtns);
-
+            const btnVis = document.createElement('button'); btnVis.className = `mini-btn ${layer.visible ? '' : 'danger'}`; btnVis.innerHTML = `<span class="material-symbols-rounded">${layer.visible ? 'visibility' : 'visibility_off'}</span>`; btnVis.title = "Visibilità"; btnVis.onclick = (e) => { e.stopPropagation(); layer.visible = !layer.visible; updateLayerTransform(layer); renderLayers(); };
+            const btnDel = document.createElement('button'); btnDel.className = 'mini-btn danger'; btnDel.innerHTML = '<span class="material-symbols-rounded">delete</span>';
+            btnDel.onclick = (e) => { e.stopPropagation(); showCustomModal(`Eliminare il livello "${layer.name}"?`, false, null, (yes) => { if(yes) { scene.layers = scene.layers.filter(l => l.id !== layer.id); if (activeLayerId === layer.id) activeLayerId = null; layer.wrapper.remove(); scene.layers.forEach(l => updateLayerTransform(l)); renderLayers(); } }); };
+            topBtns.appendChild(btnVis); topBtns.appendChild(btnDel); topRow.appendChild(nameWrap); topRow.appendChild(topBtns);
             const botRow = document.createElement('div'); botRow.className = 'layer-bottom-grid';
-
-            const btnUp = document.createElement('button'); btnUp.className = 'mini-btn'; 
-            btnUp.innerHTML = '<span class="material-symbols-rounded">arrow_upward</span>'; btnUp.title = "Sposta Su";
-            btnUp.onclick = (e) => { 
-                e.stopPropagation(); 
-                const idx = scene.layers.indexOf(layer);
-                if (idx < scene.layers.length - 1) {
-                    scene.layers[idx] = scene.layers[idx + 1];
-                    scene.layers[idx + 1] = layer;
-                    scene.layers.forEach(l => updateLayerTransform(l));
-                    renderLayers();
-                }
-            };
-            
-            const btnDown = document.createElement('button'); btnDown.className = 'mini-btn'; 
-            btnDown.innerHTML = '<span class="material-symbols-rounded">arrow_downward</span>'; btnDown.title = "Sposta Giù";
-            btnDown.onclick = (e) => { 
-                e.stopPropagation(); 
-                const idx = scene.layers.indexOf(layer);
-                if (idx > 0) {
-                    scene.layers[idx] = scene.layers[idx - 1];
-                    scene.layers[idx - 1] = layer;
-                    scene.layers.forEach(l => updateLayerTransform(l));
-                    renderLayers();
-                }
-            };
-
-            const btnLockMove = document.createElement('button'); btnLockMove.className = `mini-btn ${layer.lockMove ? 'danger' : ''}`; 
-            btnLockMove.innerHTML = `<span class="material-symbols-rounded">${layer.lockMove ? 'push_pin' : 'drag_pan'}</span>`; 
-            btnLockMove.title = "Blocca Movimento"; btnLockMove.onclick = (e) => { e.stopPropagation(); layer.lockMove = !layer.lockMove; renderLayers(); };
-
-            const btnLockScale = document.createElement('button'); btnLockScale.className = `mini-btn ${layer.lockScale ? 'danger' : ''}`; 
-            btnLockScale.innerHTML = `<span class="material-symbols-rounded">${layer.lockScale ? 'zoom_out_map' : 'search'}</span>`; 
-            btnLockScale.title = "Blocca Zoom"; btnLockScale.onclick = (e) => { e.stopPropagation(); layer.lockScale = !layer.lockScale; renderLayers(); };
-            
-            const btnRename = document.createElement('button'); btnRename.className = 'mini-btn'; 
-            btnRename.innerHTML = '<span class="material-symbols-rounded">edit</span>'; btnRename.title = "Rinomina Livello"; 
-            btnRename.onclick = (e) => { e.stopPropagation(); renameLayer(layer.id); };
-            
-            botRow.appendChild(btnUp);
-            botRow.appendChild(btnDown);
-            botRow.appendChild(btnLockMove);
-            botRow.appendChild(btnLockScale);
-            botRow.appendChild(btnRename);
-
-            container.appendChild(topRow);
-            container.appendChild(botRow);
-            
-            if (layer.needsRelink) {
-                const btnRelink = document.createElement('button'); btnRelink.className = 'row-btn btn-warning'; 
-                btnRelink.style.padding = "6px"; btnRelink.style.marginTop = "4px";
-                btnRelink.innerHTML = `<span class="material-symbols-rounded" style="font-size:16px;">sync</span> Ricarica Media`;
-                btnRelink.onclick = (e) => { e.stopPropagation(); layerToRelink = layer; document.getElementById('upload-relink').click(); };
-                container.appendChild(btnRelink);
-            }
-            
+            const btnUp = document.createElement('button'); btnUp.className = 'mini-btn'; btnUp.innerHTML = '<span class="material-symbols-rounded">arrow_upward</span>'; btnUp.title = "Sposta Su"; btnUp.onclick = (e) => { e.stopPropagation(); const idx = scene.layers.indexOf(layer); if (idx < scene.layers.length - 1) { scene.layers[idx] = scene.layers[idx + 1]; scene.layers[idx + 1] = layer; scene.layers.forEach(l => updateLayerTransform(l)); renderLayers(); } };
+            const btnDown = document.createElement('button'); btnDown.className = 'mini-btn'; btnDown.innerHTML = '<span class="material-symbols-rounded">arrow_downward</span>'; btnDown.title = "Sposta Giù"; btnDown.onclick = (e) => { e.stopPropagation(); const idx = scene.layers.indexOf(layer); if (idx > 0) { scene.layers[idx] = scene.layers[idx - 1]; scene.layers[idx - 1] = layer; scene.layers.forEach(l => updateLayerTransform(l)); renderLayers(); } };
+            const btnLockMove = document.createElement('button'); btnLockMove.className = `mini-btn ${layer.lockMove ? 'danger' : ''}`; btnLockMove.innerHTML = `<span class="material-symbols-rounded">${layer.lockMove ? 'push_pin' : 'drag_pan'}</span>`; btnLockMove.title = "Blocca Movimento"; btnLockMove.onclick = (e) => { e.stopPropagation(); layer.lockMove = !layer.lockMove; renderLayers(); };
+            const btnLockScale = document.createElement('button'); btnLockScale.className = `mini-btn ${layer.lockScale ? 'danger' : ''}`; btnLockScale.innerHTML = `<span class="material-symbols-rounded">${layer.lockScale ? 'zoom_out_map' : 'search'}</span>`; btnLockScale.title = "Blocca Zoom"; btnLockScale.onclick = (e) => { e.stopPropagation(); layer.lockScale = !layer.lockScale; renderLayers(); };
+            const btnRename = document.createElement('button'); btnRename.className = 'mini-btn'; btnRename.innerHTML = '<span class="material-symbols-rounded">edit</span>'; btnRename.title = "Rinomina Livello"; btnRename.onclick = (e) => { e.stopPropagation(); renameLayer(layer.id); };
+            botRow.appendChild(btnUp); botRow.appendChild(btnDown); botRow.appendChild(btnLockMove); botRow.appendChild(btnLockScale); botRow.appendChild(btnRename);
+            container.appendChild(topRow); container.appendChild(botRow);
+            if (layer.needsRelink) { const btnRelink = document.createElement('button'); btnRelink.className = 'row-btn btn-warning'; btnRelink.style.padding = "6px"; btnRelink.style.marginTop = "4px"; btnRelink.innerHTML = `<span class="material-symbols-rounded" style="font-size:16px;">sync</span> Ricarica Media`; btnRelink.onclick = (e) => { e.stopPropagation(); layerToRelink = layer; document.getElementById('upload-relink').click(); }; container.appendChild(btnRelink); }
             layerListEl.appendChild(container);
         });
     }
 
-    function applyWorldTransform(x, y, s) {
-        const scene = scenes.find(sc => sc.id === currentSceneId);
-        if(scene) { scene.panX = x; scene.panY = y; scene.scale = s; }
-        worldContainer.style.transform = `translate(${x}px, ${y}px) scale(${s})`;
-    }
+    function applyWorldTransform(x, y, s) { const scene = scenes.find(sc => sc.id === currentSceneId); if(scene) { scene.panX = x; scene.panY = y; scene.scale = s; } worldContainer.style.transform = `translate(${x}px, ${y}px) scale(${s})`; }
 
     function scaleLayer(layer, factor, centerX, centerY, scene) {
-        if (layer.lockScale) return;
-        const worldX = (centerX - scene.panX) / scene.scale; const worldY = (centerY - scene.panY) / scene.scale;
-        const cx = layer.x + layer.nWidth / 2; const cy = layer.y + layer.nHeight / 2;
-        const dx = (worldX - cx); const dy = (worldY - cy);
-        const newScale = Math.max(0.01, Math.min(layer.scale * factor, 50)); 
-        const actualFactor = newScale / layer.scale;
-        layer.scale = newScale;
-        layer.x = (worldX - dx * actualFactor) - layer.nWidth / 2;
-        layer.y = (worldY - dy * actualFactor) - layer.nHeight / 2;
-        updateLayerTransform(layer);
+        if (layer.lockScale) return; const worldX = (centerX - scene.panX) / scene.scale; const worldY = (centerY - scene.panY) / scene.scale; const cx = layer.x + layer.nWidth / 2; const cy = layer.y + layer.nHeight / 2;
+        const dx = (worldX - cx); const dy = (worldY - cy); const newScale = Math.max(0.01, Math.min(layer.scale * factor, 50)); const actualFactor = newScale / layer.scale;
+        layer.scale = newScale; layer.x = (worldX - dx * actualFactor) - layer.nWidth / 2; layer.y = (worldY - dy * actualFactor) - layer.nHeight / 2; updateLayerTransform(layer);
     }
 
     function doGlobalZoom(factor, centerX = window.innerWidth/2, centerY = window.innerHeight/2) {
-        const scene = scenes.find(sc => sc.id === currentSceneId);
-        if (!scene || scene.cameraLocked) return; 
-        const worldX = (centerX - scene.panX) / scene.scale; const worldY = (centerY - scene.panY) / scene.scale;
-        let newScale = Math.max(0.05, Math.min(scene.scale * factor, 15));
+        const scene = scenes.find(sc => sc.id === currentSceneId); if (!scene || scene.cameraLocked) return; 
+        const worldX = (centerX - scene.panX) / scene.scale; const worldY = (centerY - scene.panY) / scene.scale; let newScale = Math.max(0.05, Math.min(scene.scale * factor, 15));
         applyWorldTransform(centerX - (worldX * newScale), centerY - (worldY * newScale), newScale);
     }
     
     viewport.addEventListener('wheel', (e) => { 
-        e.preventDefault(); 
-        const factor = e.deltaY < 0 ? 1.1 : 0.9;
-        const scene = scenes.find(sc => sc.id === currentSceneId);
-        const activeLayer = scene?.layers.find(l => l.id === activeLayerId);
-        if (currentMode === 'layer' && activeLayer) scaleLayer(activeLayer, factor, e.clientX, e.clientY, scene);
-        else doGlobalZoom(factor, e.clientX, e.clientY);
+        e.preventDefault(); const factor = e.deltaY < 0 ? 1.1 : 0.9; const scene = scenes.find(sc => sc.id === currentSceneId); const activeLayer = scene?.layers.find(l => l.id === activeLayerId);
+        if (currentMode === 'layer' && activeLayer) scaleLayer(activeLayer, factor, e.clientX, e.clientY, scene); else doGlobalZoom(factor, e.clientX, e.clientY);
     }, {passive: false});
 
-    const tools = { 
-        'camera': document.getElementById('tool-camera'), 
-        'layer': document.getElementById('tool-layer'), 
-        'draw': document.getElementById('tool-draw'), 
-        'erase': document.getElementById('tool-erase'),
-        'hl-draw': document.getElementById('tool-hl-draw'), 
-        'hl-erase': document.getElementById('tool-hl-erase')
-    };
+    const tools = { 'camera': document.getElementById('tool-camera'), 'layer': document.getElementById('tool-layer'), 'draw': document.getElementById('tool-draw'), 'erase': document.getElementById('tool-erase'), 'hl-draw': document.getElementById('tool-hl-draw'), 'hl-erase': document.getElementById('tool-hl-erase') };
     
     function updateToolUI(mode) {
         currentMode = mode;
         Object.values(tools).forEach(btn => { if(btn) btn.classList.remove('active'); });
         if(tools[mode]) tools[mode].classList.add('active');
-        if ((mode === 'layer' || mode === 'draw' || mode === 'erase' || mode === 'hl-draw' || mode === 'hl-erase') && !activeLayerId) {
+        
+        // MOSTRA/NASCONDI BARRA CONTESTUALE
+        if (['draw', 'erase', 'hl-draw', 'hl-erase'].includes(mode)) {
+            subToolbar.classList.remove('hidden');
+            if (mode === 'hl-draw') {
+                subColors.style.display = 'flex';
+            } else {
+                subColors.style.display = 'none';
+            }
+        } else {
+            subToolbar.classList.add('hidden');
+        }
+
+        if ((['layer', 'draw', 'erase', 'hl-draw', 'hl-erase'].includes(mode)) && !activeLayerId) {
             const scene = scenes.find(s => s.id === currentSceneId);
             if (scene && scene.layers.length > 0) { activeLayerId = scene.layers[scene.layers.length - 1].id; renderLayers(); }
         }
@@ -1096,101 +773,58 @@ try {
     function getPointerPos(e) { return (e.touches && e.touches.length > 0) ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : { x: e.clientX, y: e.clientY }; }
     function getDist(touches) { return Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY); }
     function getMid(touches) { return { x: (touches[0].clientX + touches[1].clientX) / 2, y: (touches[0].clientY + touches[1].clientY) / 2 }; }
-
-    function getWorldCoords(screenX, screenY, scene) {
-        return { x: (screenX - scene.panX) / scene.scale, y: (screenY - scene.panY) / scene.scale };
-    }
+    function getWorldCoords(screenX, screenY, scene) { return { x: (screenX - scene.panX) / scene.scale, y: (screenY - scene.panY) / scene.scale }; }
 
     function getLayerLocalCoordsRaw(screenX, screenY, scene, layer) {
-        const worldCoords = getWorldCoords(screenX, screenY, scene);
-        const cx = layer.x + layer.nWidth / 2; const cy = layer.y + layer.nHeight / 2;
-        const dx = (worldCoords.x - cx) / layer.scale; const dy = (worldCoords.y - cy) / layer.scale;
-        const rad = (layer.rotation || 0) * Math.PI / 180;
-        const localX = (layer.nWidth / 2) + dx * Math.cos(rad) + dy * Math.sin(rad);
-        const localY = (layer.nHeight / 2) - dx * Math.sin(rad) + dy * Math.cos(rad);
+        const worldCoords = getWorldCoords(screenX, screenY, scene); const cx = layer.x + layer.nWidth / 2; const cy = layer.y + layer.nHeight / 2;
+        const dx = (worldCoords.x - cx) / layer.scale; const dy = (worldCoords.y - cy) / layer.scale; const rad = (layer.rotation || 0) * Math.PI / 180;
+        const localX = (layer.nWidth / 2) + dx * Math.cos(rad) + dy * Math.sin(rad); const localY = (layer.nHeight / 2) - dx * Math.sin(rad) + dy * Math.cos(rad);
         return { x: localX, y: localY };
     }
 
     function handleStart(e) {
         if(e.target.closest('.glass-panel') || e.target.closest('#reveal-ui') || e.target.closest('#toast-container') || e.target.closest('#custom-modal-overlay')) return;
+        const currentTime = new Date().getTime(); if (currentTime - lastTapTime < 300 && (!e.touches || e.touches.length === 1)) { toggleCinemaMode(); e.preventDefault(); return; }
+        lastTapTime = currentTime; if(!currentSceneId) return; e.preventDefault();
         
-        const currentTime = new Date().getTime();
-        if (currentTime - lastTapTime < 300 && (!e.touches || e.touches.length === 1)) {
-            toggleCinemaMode(); e.preventDefault(); return;
-        }
-        lastTapTime = currentTime;
-
-        if(!currentSceneId) return;
-        e.preventDefault();
-        
-        const scene = scenes.find(s => s.id === currentSceneId);
-        const activeLayer = scene.layers.find(l => l.id === activeLayerId);
-        isInteracting = true;
-
-        if (e.touches && e.touches.length === 2) {
-            lastPinchDist = getDist(e.touches); lastPinchMid = getMid(e.touches); return;
-        }
-
+        const scene = scenes.find(s => s.id === currentSceneId); const activeLayer = scene.layers.find(l => l.id === activeLayerId); isInteracting = true;
+        if (e.touches && e.touches.length === 2) { lastPinchDist = getDist(e.touches); lastPinchMid = getMid(e.touches); return; }
         const pos = getPointerPos(e);
 
-        pingTimer = setTimeout(() => {
-            isInteracting = false; 
-            const wPos = getWorldCoords(pos.x, pos.y, scene);
-            triggerPing(wPos.x, wPos.y);
-        }, 500);
+        pingTimer = setTimeout(() => { isInteracting = false; const wPos = getWorldCoords(pos.x, pos.y, scene); triggerPing(wPos.x, wPos.y); }, 500);
 
         if (currentMode === 'camera') {
-            if (scene.cameraLocked) return; 
-            startX = pos.x - scene.panX; startY = pos.y - scene.panY;
+            if (scene.cameraLocked) return; startX = pos.x - scene.panX; startY = pos.y - scene.panY;
         } else if (currentMode === 'layer' && activeLayer) {
-            if (!activeLayer.lockMove) {
-                startX = ((pos.x - scene.panX) / scene.scale) - activeLayer.x; startY = ((pos.y - scene.panY) / scene.scale) - activeLayer.y;
-            }
+            if (!activeLayer.lockMove) { startX = ((pos.x - scene.panX) / scene.scale) - activeLayer.x; startY = ((pos.y - scene.panY) / scene.scale) - activeLayer.y; }
         } else if ((currentMode === 'draw' || currentMode === 'erase') && activeLayer) {
             const rawPos = getLayerLocalCoordsRaw(pos.x, pos.y, scene, activeLayer);
             activeLayer.ctx.lineWidth = (document.getElementById('brush-size').value / scene.scale / activeLayer.scale) * activeLayer.fogRatio;
-            activeLayer.ctx.lineCap = 'round'; activeLayer.ctx.lineJoin = 'round';
-            activeLayer.ctx.globalCompositeOperation = currentMode === 'draw' ? 'source-over' : 'destination-out';
-            activeLayer.ctx.strokeStyle = 'black';
-            drawCurrX = rawPos.x * activeLayer.fogRatio; 
-            drawCurrY = rawPos.y * activeLayer.fogRatio;
-            drawLastX = drawCurrX; drawLastY = drawCurrY;
+            activeLayer.ctx.lineCap = 'round'; activeLayer.ctx.lineJoin = 'round'; activeLayer.ctx.globalCompositeOperation = currentMode === 'draw' ? 'source-over' : 'destination-out';
+            activeLayer.ctx.strokeStyle = 'black'; drawCurrX = rawPos.x * activeLayer.fogRatio; drawCurrY = rawPos.y * activeLayer.fogRatio; drawLastX = drawCurrX; drawLastY = drawCurrY;
             activeLayer.ctx.beginPath(); activeLayer.ctx.moveTo(drawCurrX, drawCurrY); activeLayer.ctx.lineTo(drawCurrX+0.1, drawCurrY+0.1); activeLayer.ctx.stroke();
-        } 
-        else if ((currentMode === 'hl-draw' || currentMode === 'hl-erase') && activeLayer) {
+        } else if ((currentMode === 'hl-draw' || currentMode === 'hl-erase') && activeLayer) {
             const rawPos = getLayerLocalCoordsRaw(pos.x, pos.y, scene, activeLayer);
             activeLayer.hlCtx.lineWidth = (document.getElementById('brush-size').value / scene.scale / activeLayer.scale) * activeLayer.fogRatio;
             activeLayer.hlCtx.lineCap = 'round'; activeLayer.hlCtx.lineJoin = 'round';
-            
-            if (currentMode === 'hl-draw') {
-                activeLayer.hlCtx.globalCompositeOperation = 'source-over';
-                activeLayer.hlCtx.strokeStyle = currentHlColor;
-            } else {
-                activeLayer.hlCtx.globalCompositeOperation = 'destination-out';
-                activeLayer.hlCtx.strokeStyle = 'rgba(0,0,0,1)';
-            }
-            
-            drawCurrX = rawPos.x * activeLayer.fogRatio; 
-            drawCurrY = rawPos.y * activeLayer.fogRatio;
-            drawLastX = drawCurrX; drawLastY = drawCurrY;
+            if (currentMode === 'hl-draw') { activeLayer.hlCtx.globalCompositeOperation = 'source-over'; activeLayer.hlCtx.strokeStyle = currentHlColor; } 
+            else { activeLayer.hlCtx.globalCompositeOperation = 'destination-out'; activeLayer.hlCtx.strokeStyle = 'rgba(0,0,0,1)'; }
+            drawCurrX = rawPos.x * activeLayer.fogRatio; drawCurrY = rawPos.y * activeLayer.fogRatio; drawLastX = drawCurrX; drawLastY = drawCurrY;
             activeLayer.hlCtx.beginPath(); activeLayer.hlCtx.moveTo(drawCurrX, drawCurrY); activeLayer.hlCtx.lineTo(drawCurrX+0.1, drawCurrY+0.1); activeLayer.hlCtx.stroke();
         }
     }
 
     function handleMove(e) {
         if(pingTimer) { clearTimeout(pingTimer); pingTimer = null; }
-        if (!isInteracting) return;
-        e.preventDefault();
-        const scene = scenes.find(s => s.id === currentSceneId);
-        const activeLayer = scene?.layers.find(l => l.id === activeLayerId);
+        if (!isInteracting) return; e.preventDefault();
+        const scene = scenes.find(s => s.id === currentSceneId); const activeLayer = scene?.layers.find(l => l.id === activeLayerId);
 
         if (e.touches && e.touches.length === 2) {
             const currentDist = getDist(e.touches); const currentMid = getMid(e.touches);
             if (lastPinchDist) {
                 const zoomFactor = currentDist / lastPinchDist;
-                if (currentMode === 'layer' && activeLayer) {
-                    scaleLayer(activeLayer, zoomFactor, currentMid.x, currentMid.y, scene);
-                } else {
+                if (currentMode === 'layer' && activeLayer) { scaleLayer(activeLayer, zoomFactor, currentMid.x, currentMid.y, scene); } 
+                else {
                     if (scene.cameraLocked) return; 
                     const worldX = (currentMid.x - scene.panX) / scene.scale; const worldY = (currentMid.y - scene.panY) / scene.scale;
                     let newScale = Math.max(0.05, Math.min(scene.scale * zoomFactor, 15));
@@ -1202,70 +836,33 @@ try {
 
         const pos = getPointerPos(e);
         if (currentMode === 'camera') {
-            if (scene.cameraLocked) return; 
-            applyWorldTransform(pos.x - startX, pos.y - startY, scene.scale);
+            if (scene.cameraLocked) return; applyWorldTransform(pos.x - startX, pos.y - startY, scene.scale);
         } else if (currentMode === 'layer' && activeLayer) {
-            if (!activeLayer.lockMove) {
-                activeLayer.x = ((pos.x - scene.panX) / scene.scale) - startX; 
-                activeLayer.y = ((pos.y - scene.panY) / scene.scale) - startY; 
-                updateLayerTransform(activeLayer);
-            }
+            if (!activeLayer.lockMove) { activeLayer.x = ((pos.x - scene.panX) / scene.scale) - startX; activeLayer.y = ((pos.y - scene.panY) / scene.scale) - startY; updateLayerTransform(activeLayer); }
         } else if ((currentMode === 'draw' || currentMode === 'erase') && activeLayer) {
-            const rawPos = getLayerLocalCoordsRaw(pos.x, pos.y, scene, activeLayer);
-            drawCurrX = rawPos.x * activeLayer.fogRatio; 
-            drawCurrY = rawPos.y * activeLayer.fogRatio;
-            if (!pendingDraw) {
-                pendingDraw = true;
-                requestAnimationFrame(() => {
-                    activeLayer.ctx.beginPath(); activeLayer.ctx.moveTo(drawLastX, drawLastY); activeLayer.ctx.lineTo(drawCurrX, drawCurrY); activeLayer.ctx.stroke();
-                    drawLastX = drawCurrX; drawLastY = drawCurrY; pendingDraw = false;
-                });
-            }
-        }
-        else if ((currentMode === 'hl-draw' || currentMode === 'hl-erase') && activeLayer) {
-            const rawPos = getLayerLocalCoordsRaw(pos.x, pos.y, scene, activeLayer);
-            drawCurrX = rawPos.x * activeLayer.fogRatio; 
-            drawCurrY = rawPos.y * activeLayer.fogRatio;
-            if (!pendingDraw) {
-                pendingDraw = true;
-                requestAnimationFrame(() => {
-                    activeLayer.hlCtx.beginPath(); activeLayer.hlCtx.moveTo(drawLastX, drawLastY); activeLayer.hlCtx.lineTo(drawCurrX, drawCurrY); activeLayer.hlCtx.stroke();
-                    drawLastX = drawCurrX; drawLastY = drawCurrY; pendingDraw = false;
-                });
-            }
+            const rawPos = getLayerLocalCoordsRaw(pos.x, pos.y, scene, activeLayer); drawCurrX = rawPos.x * activeLayer.fogRatio; drawCurrY = rawPos.y * activeLayer.fogRatio;
+            if (!pendingDraw) { pendingDraw = true; requestAnimationFrame(() => { activeLayer.ctx.beginPath(); activeLayer.ctx.moveTo(drawLastX, drawLastY); activeLayer.ctx.lineTo(drawCurrX, drawCurrY); activeLayer.ctx.stroke(); drawLastX = drawCurrX; drawLastY = drawCurrY; pendingDraw = false; }); }
+        } else if ((currentMode === 'hl-draw' || currentMode === 'hl-erase') && activeLayer) {
+            const rawPos = getLayerLocalCoordsRaw(pos.x, pos.y, scene, activeLayer); drawCurrX = rawPos.x * activeLayer.fogRatio; drawCurrY = rawPos.y * activeLayer.fogRatio;
+            if (!pendingDraw) { pendingDraw = true; requestAnimationFrame(() => { activeLayer.hlCtx.beginPath(); activeLayer.hlCtx.moveTo(drawLastX, drawLastY); activeLayer.hlCtx.lineTo(drawCurrX, drawCurrY); activeLayer.hlCtx.stroke(); drawLastX = drawCurrX; drawLastY = drawCurrY; pendingDraw = false; }); }
         }
     }
 
-    function handleEnd(e) {
-        if(pingTimer) { clearTimeout(pingTimer); pingTimer = null; }
-        if (e.touches && e.touches.length < 2) { lastPinchDist = null; lastPinchMid = null; }
-        isInteracting = false;
-    }
+    function handleEnd(e) { if(pingTimer) { clearTimeout(pingTimer); pingTimer = null; } if (e.touches && e.touches.length < 2) { lastPinchDist = null; lastPinchMid = null; } isInteracting = false; }
 
     viewport.addEventListener('mousedown', handleStart); viewport.addEventListener('mousemove', handleMove); window.addEventListener('mouseup', handleEnd);
-    viewport.addEventListener('touchstart', handleStart, {passive: false}); viewport.addEventListener('touchmove', handleMove, {passive: false});
-    window.addEventListener('touchend', handleEnd); window.addEventListener('touchcancel', handleEnd);
+    viewport.addEventListener('touchstart', handleStart, {passive: false}); viewport.addEventListener('touchmove', handleMove, {passive: false}); window.addEventListener('touchend', handleEnd); window.addEventListener('touchcancel', handleEnd);
     
-    document.getElementById('btn-fullscreen').onclick = () => {
-        if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(err => console.log(err));
-        else if (document.exitFullscreen) document.exitFullscreen();
-    };
+    document.getElementById('btn-fullscreen').onclick = () => { if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(err => console.log(err)); else if (document.exitFullscreen) document.exitFullscreen(); };
 
-    const leftToolbar = document.getElementById('left-toolbar');
-    const rightPanel = document.getElementById('right-panel');
-    const revealUiBtn = document.getElementById('reveal-ui');
+    const leftToolbar = document.getElementById('left-toolbar'); const rightPanel = document.getElementById('right-panel'); const revealUiBtn = document.getElementById('reveal-ui');
 
-    document.getElementById('hide-ui').onclick = () => { 
-        leftToolbar.classList.add('hidden'); rightPanel.classList.add('hidden'); revealUiBtn.classList.remove('hidden'); isCinemaMode = true; 
-    };
-    
-    revealUiBtn.onclick = () => { 
-        leftToolbar.classList.remove('hidden'); rightPanel.classList.remove('hidden'); revealUiBtn.classList.add('hidden'); isCinemaMode = false; 
-    };
+    document.getElementById('hide-ui').onclick = () => { leftToolbar.classList.add('hidden'); rightPanel.classList.add('hidden'); subToolbar.classList.add('hidden'); revealUiBtn.classList.remove('hidden'); isCinemaMode = true; };
+    revealUiBtn.onclick = () => { leftToolbar.classList.remove('hidden'); rightPanel.classList.remove('hidden'); updateToolUI(currentMode); revealUiBtn.classList.add('hidden'); isCinemaMode = false; };
 
     function toggleCinemaMode() {
         isCinemaMode = !isCinemaMode;
-        if (isCinemaMode) { leftToolbar.classList.add('hidden'); rightPanel.classList.add('hidden'); revealUiBtn.classList.add('hidden'); } 
+        if (isCinemaMode) { leftToolbar.classList.add('hidden'); rightPanel.classList.add('hidden'); subToolbar.classList.add('hidden'); revealUiBtn.classList.add('hidden'); } 
         else { revealUiBtn.classList.remove('hidden'); }
     }
 
