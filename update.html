@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>D&D Tavolo Proiettore - V39 Contextual Perfection</title>
+    <title>D&D Tavolo Proiettore - V40 Smart Panels</title>
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
     <style>
         /* --- RESET E BASE --- */
@@ -240,14 +240,19 @@
     </div>
 
     <div class="acc-group">
-        <button class="acc-btn active"><span class="material-symbols-rounded">map</span> Mappe e Livelli</button>
+        <button class="acc-btn active"><span class="material-symbols-rounded">movie</span> Gestione Scene</button>
         <div class="acc-content" style="display: block;">
             <div class="list-container" id="scene-list"></div>
-            <button id="btn-new-scene" class="row-btn btn-primary" style="width: 100%; margin-top: 4px; margin-bottom:15px;"><span class="material-symbols-rounded">add</span> Nuova Scena</button>
-            
-            <label>Aggiungi Livello alla Scena:</label>
+            <button id="btn-new-scene" class="row-btn btn-primary" style="width: 100%; margin-top: 4px;"><span class="material-symbols-rounded">add</span> Nuova Scena</button>
+        </div>
+    </div>
+
+    <div class="acc-group">
+        <button class="acc-btn"><span class="material-symbols-rounded">layers</span> Livelli della Scena</button>
+        <div class="acc-content">
+            <label>Aggiungi Nuovo Livello:</label>
             <div class="row" style="margin-bottom: 12px;">
-                <button id="btn-upload-trigger" class="row-btn" style="background: rgba(255,255,255,0.15);"><span class="material-symbols-rounded">image</span> Img/Video</button>
+                <button id="btn-upload-trigger" class="row-btn" style="background: rgba(255,255,255,0.15);"><span class="material-symbols-rounded">image</span> File Media</button>
                 <button id="btn-yt-layer" class="row-btn" style="background: rgba(255,59,48,0.8);"><span class="material-symbols-rounded">smart_display</span> YouTube</button>
                 <input type="file" id="upload-layer" accept="image/*,video/*" class="hidden">
             </div>
@@ -277,8 +282,11 @@
                 <button id="btn-reset-rot" class="row-btn" style="flex:none; width:48px; padding:6px;">0°</button>
             </div>
 
-            <label style="display:flex; justify-content:space-between; margin-top:20px;">Volume: <span id="vol-display" style="color:#34c759;">0%</span></label>
-            <input type="range" id="layer-volume" min="0" max="100" value="0" disabled>
+            <div id="volume-wrapper" style="display: none; margin-top: 20px;">
+                <label style="display:flex; justify-content:space-between;">Volume Video: <span id="vol-display" style="color:#34c759;">0%</span></label>
+                <input type="range" id="layer-volume" min="0" max="100" value="0">
+            </div>
+            
         </div>
     </div>
 
@@ -384,6 +392,7 @@ try {
     const btnLockCamera = document.getElementById('btn-lock-camera');
     const rotSlider = document.getElementById('layer-rotation');
     const volSlider = document.getElementById('layer-volume');
+    const volumeWrapper = document.getElementById('volume-wrapper'); // Nuovo elemento wrapper del volume
     const calibSquare = document.getElementById('calibration-square');
     const rotDisplay = document.getElementById('rot-display');
     const volDisplay = document.getElementById('vol-display');
@@ -933,7 +942,8 @@ try {
         
         if (!scene) {
             rotSlider.value = 0; rotDisplay.innerText = "0°";
-            volSlider.value = 0; volDisplay.innerText = "0%"; volSlider.disabled = true; 
+            if(volumeWrapper) volumeWrapper.style.display = 'none';
+            volSlider.disabled = true; 
             document.getElementById('atmosphere-select').value = 'none';
             return;
         }
@@ -943,15 +953,24 @@ try {
             if (activeL) {
                 rotSlider.value = activeL.rotation || 0; rotDisplay.innerText = (activeL.rotation || 0) + "°";
                 document.getElementById('atmosphere-select').value = activeL.filter || 'none';
+                
+                // LOGICA VOLUME INTELLIGENTE
                 if(activeL.isVideo || activeL.ytId) {
-                    volSlider.disabled = false; volSlider.value = activeL.volume || 0; volDisplay.innerText = (activeL.volume || 0) + "%";
+                    if(volumeWrapper) volumeWrapper.style.display = 'block';
+                    volSlider.disabled = false; 
+                    volSlider.value = activeL.volume || 0; 
+                    volDisplay.innerText = (activeL.volume || 0) + "%";
                 } else {
-                    volSlider.disabled = true; volSlider.value = 0; volDisplay.innerText = "0%";
+                    if(volumeWrapper) volumeWrapper.style.display = 'none';
+                    volSlider.disabled = true; 
+                    volSlider.value = 0; 
+                    volDisplay.innerText = "0%";
                 }
             }
         } else {
             rotSlider.value = 0; rotDisplay.innerText = "0°";
-            volSlider.value = 0; volDisplay.innerText = "0%"; volSlider.disabled = true;
+            if(volumeWrapper) volumeWrapper.style.display = 'none';
+            volSlider.disabled = true;
             document.getElementById('atmosphere-select').value = 'none';
         }
 
