@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>D&D Tavolo Proiettore - V34 Pro UI</title>
+    <title>D&D Tavolo Proiettore - Final Fullscreen Fix</title>
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
     <style>
         /* --- RESET E BASE --- */
@@ -40,10 +40,10 @@
 
         #calibration-square { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); border: 4px solid #ff3333; background: rgba(255, 51, 51, 0.3); z-index: 1000; pointer-events: none; width: 50px; height: 50px; display: none; }
 
-        /* --- UI GLASSMORPHISM (Ottimizzato Anti-Lag) --- */
+        /* --- UI GLASSMORPHISM --- */
         .glass-panel {
-            background: rgba(20, 24, 28, 0.85); /* Leggermente più opaco */
-            backdrop-filter: blur(8px); /* Blur abbassato drasticamente per prestazioni */
+            background: rgba(20, 24, 28, 0.85); 
+            backdrop-filter: blur(8px); 
             -webkit-backdrop-filter: blur(8px);
             border: 1px solid rgba(255, 255, 255, 0.1);
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
@@ -81,7 +81,7 @@
         #right-panel::-webkit-scrollbar { width: 6px; }
         #right-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.25); border-radius: 10px; }
 
-        /* ACCORDIONS E GRUPPI (Senza spaziature brutte) */
+        /* ACCORDIONS */
         .acc-group { display: flex; flex-direction: column; width: 100%; border-radius: 12px; overflow: hidden; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); }
         .acc-btn { 
             width: 100%; text-align: left; background: transparent; color: #fff; 
@@ -105,7 +105,6 @@
         select { width: 100%; background: rgba(0,0,0,0.4); color: white; border: 1px solid rgba(255,255,255,0.2); padding: 10px; border-radius: 10px; font-size: 14px; outline: none; }
         select option { background: #222; }
 
-        /* Palette Evidenziatore */
         .color-swatch { width: 32px; height: 32px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; transition: 0.2s; flex-shrink: 0; }
         .color-swatch:hover { transform: scale(1.1); }
         .color-swatch.active { border-color: white; transform: scale(1.2); box-shadow: 0 0 12px currentColor; }
@@ -129,6 +128,13 @@
         .hidden { display: none !important; opacity: 0; pointer-events: none; }
         
         #reveal-ui { position: absolute; top: 20px; right: 20px; z-index: 1000; background: rgba(25,30,35,0.8); backdrop-filter: blur(10px); color: white; border-radius: 50%; width: 60px; height: 60px; border: 1px solid rgba(255,255,255,0.2); cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 20px rgba(0,0,0,0.6);}
+
+        /* NUOVA MODAL CUSTOM (Sostituisce i prompt di sistema per non uscire dal fullscreen) */
+        #custom-modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 10000; display: none; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
+        #custom-modal { display: flex; flex-direction: column; gap: 16px; width: 340px; padding: 24px; text-align: center; }
+        #modal-text { font-size: 16px; font-weight: 600; color: white; }
+        #modal-input { width: 100%; padding: 12px; border-radius: 10px; background: rgba(0,0,0,0.6); color: white; border: 1px solid rgba(255,255,255,0.2); font-size: 15px; outline: none; }
+        #modal-input:focus { border-color: #0a84ff; }
 
         /* TOAST NOTIFICATIONS */
         #toast-container { position: fixed; top: 30px; left: 50%; transform: translateX(-50%); z-index: 9999; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
@@ -155,6 +161,17 @@
 <div id="loading-overlay"><div class="spinner"></div><div id="loading-text">Caricamento in corso...</div></div>
 <div id="toast-container"></div>
 <div id="atmosphere-overlay"></div>
+
+<div id="custom-modal-overlay">
+    <div id="custom-modal" class="glass-panel">
+        <div id="modal-text">Messaggio</div>
+        <input type="text" id="modal-input" autocomplete="off">
+        <div class="row" style="margin-top: 8px;">
+            <button id="modal-cancel" class="row-btn" style="background: rgba(255,255,255,0.1);">Annulla</button>
+            <button id="modal-ok" class="row-btn btn-primary">Conferma</button>
+        </div>
+    </div>
+</div>
 
 <div id="left-toolbar" class="glass-panel">
     <button id="tool-camera" class="tool-btn active" title="Sposta Camera"><span class="material-symbols-rounded">pan_tool</span></button>
@@ -264,6 +281,49 @@
 </div>
 
 <script>
+// --- LOGICA MODAL CUSTOM (Sostituisce alert/prompt/confirm di sistema) ---
+const customModalOverlay = document.getElementById('custom-modal-overlay');
+const modalText = document.getElementById('modal-text');
+const modalInput = document.getElementById('modal-input');
+const modalOk = document.getElementById('modal-ok');
+const modalCancel = document.getElementById('modal-cancel');
+
+function showCustomModal(text, isPrompt = false, defaultValue = "", callback = null) {
+    modalText.innerText = text;
+    
+    if(isPrompt) {
+        modalInput.style.display = 'block';
+        modalInput.value = defaultValue;
+        setTimeout(() => modalInput.focus(), 100);
+    } else {
+        modalInput.style.display = 'none';
+    }
+    
+    customModalOverlay.style.display = 'flex';
+    
+    // Rimuovi vecchi listener
+    modalOk.onclick = null;
+    modalCancel.onclick = null;
+    
+    modalOk.onclick = () => {
+        customModalOverlay.style.display = 'none';
+        if(callback) callback(isPrompt ? modalInput.value : true);
+    };
+    
+    modalCancel.onclick = () => {
+        customModalOverlay.style.display = 'none';
+        if(callback) callback(isPrompt ? null : false);
+    };
+}
+
+// Premendo INVIO si conferma
+modalInput.addEventListener("keyup", function(event) {
+    if (event.key === "Enter") {
+        event.preventDefault();
+        modalOk.click();
+    }
+});
+
 // --- LOGICA ACCORDION ---
 document.querySelectorAll('.acc-btn').forEach(btn => {
     btn.onclick = () => {
@@ -446,20 +506,26 @@ try {
 
     function renameScene(id) {
         const scene = scenes.find(s => s.id === id);
-        const newName = prompt("Inserisci il nuovo nome della scena:", scene.name);
-        if (newName) { scene.name = newName; renderSceneList(); }
+        showCustomModal("Inserisci il nuovo nome della scena:", true, scene.name, (newName) => {
+            if (newName && newName.trim() !== "") {
+                scene.name = newName;
+                renderSceneList();
+            }
+        });
     }
 
     function deleteScene(id) {
         const scene = scenes.find(s => s.id === id);
-        if (confirm(`Eliminare definitivamente la scena "${scene.name}"?`)) {
-            scene.layers.forEach(l => { if(l.mediaEl) l.mediaEl.src = ""; });
-            scenes = scenes.filter(s => s.id !== id);
-            if (scenes.length === 0) createNewScene();
-            else if (currentSceneId === id) switchScene(scenes[0].id);
-            else renderSceneList();
-            showToast("Scena eliminata.", "error");
-        }
+        showCustomModal(`Eliminare definitivamente la scena "${scene.name}"?`, false, null, (confirmed) => {
+            if (confirmed) {
+                scene.layers.forEach(l => { if(l.mediaEl) l.mediaEl.src = ""; });
+                scenes = scenes.filter(s => s.id !== id);
+                if (scenes.length === 0) createNewScene();
+                else if (currentSceneId === id) switchScene(scenes[0].id);
+                else renderSceneList();
+                showToast("Scena eliminata.", "error");
+            }
+        });
     }
 
     function updateCameraLockUI(scene) {
@@ -566,8 +632,12 @@ try {
     function renameLayer(id) {
         const scene = scenes.find(s => s.id === currentSceneId);
         const layer = scene.layers.find(l => l.id === id);
-        const newName = prompt("Inserisci il nuovo nome del livello:", layer.name);
-        if (newName) { layer.name = newName; renderLayers(); }
+        showCustomModal("Inserisci il nuovo nome del livello:", true, layer.name, (newName) => {
+            if (newName && newName.trim() !== "") {
+                layer.name = newName;
+                renderLayers();
+            }
+        });
     }
 
     // --- EVENT LISTENERS UI ---
@@ -598,7 +668,7 @@ try {
         const layer = scene?.layers.find(l => l.id === activeLayerId);
         if(layer) { 
             layer.hlCtx.clearRect(0, 0, layer.hlCanvas.width, layer.hlCanvas.height); 
-            showToast("Disegni rimossi.", "success");
+            showToast("Disegni rimossi dal livello.", "success");
         } else {
             showToast("Seleziona un livello da pulire.", "error");
         }
@@ -606,31 +676,33 @@ try {
 
     document.getElementById('btn-upload-trigger').onclick = () => document.getElementById('upload-layer').click();
 
-    document.getElementById('btn-yt-layer').onclick = async () => {
-        const url = prompt("Incolla qui il link del video di YouTube:");
-        if (!url) return;
-        const ytId = extractYouTubeID(url);
-        if (!ytId) { showToast("Link non valido!", "error"); return; }
+    // Modificato YT con Custom Modal
+    document.getElementById('btn-yt-layer').onclick = () => {
+        showCustomModal("Incolla qui il link del video di YouTube:", true, "", async (url) => {
+            if (!url) return;
+            const ytId = extractYouTubeID(url);
+            if (!ytId) { showToast("Link non valido!", "error"); return; }
 
-        const scene = scenes.find(s => s.id === currentSceneId);
-        if (!scene) return;
+            const scene = scenes.find(s => s.id === currentSceneId);
+            if (!scene) return;
 
-        loadingOverlay.style.display = 'flex';
-        const nWidth = 1920; const nHeight = 1080;
-        const fogRatio = MAX_FOG_RES / Math.max(nWidth, nHeight);
+            loadingOverlay.style.display = 'flex';
+            const nWidth = 1920; const nHeight = 1080;
+            const fogRatio = MAX_FOG_RES / Math.max(nWidth, nHeight);
 
-        const domElements = await createLayerDOM(null, nWidth, nHeight, fogRatio, null, null, false, ytId);
+            const domElements = await createLayerDOM(null, nWidth, nHeight, fogRatio, null, null, false, ytId);
 
-        layerCounter++;
-        const newLayer = {
-            id: layerCounter, name: `Mappa YouTube`, fileName: `YT: ${ytId}`, imgSrc: null, ytId: ytId, 
-            nWidth: nWidth, nHeight: nHeight, wrapper: domElements.wrapper, canvas: domElements.canvas, ctx: domElements.ctx, hlCanvas: domElements.hlCanvas, hlCtx: domElements.hlCtx, mediaEl: domElements.mediaEl, atmosphereEl: domElements.atmosphereEl,
-            fogRatio: fogRatio, x: 0, y: 0, scale: 1, rotation: 0, volume: 0, visible: true, lockMove: false, lockScale: false,
-            isVideo: false, needsRelink: false, filter: 'none'
-        };
-        
-        finalizeLayerAddition(scene, newLayer, nWidth, nHeight);
-        loadingOverlay.style.display = 'none';
+            layerCounter++;
+            const newLayer = {
+                id: layerCounter, name: `Mappa YouTube`, fileName: `YT: ${ytId}`, imgSrc: null, ytId: ytId, 
+                nWidth: nWidth, nHeight: nHeight, wrapper: domElements.wrapper, canvas: domElements.canvas, ctx: domElements.ctx, hlCanvas: domElements.hlCanvas, hlCtx: domElements.hlCtx, mediaEl: domElements.mediaEl, atmosphereEl: domElements.atmosphereEl,
+                fogRatio: fogRatio, x: 0, y: 0, scale: 1, rotation: 0, volume: 0, visible: true, lockMove: false, lockScale: false,
+                isVideo: false, needsRelink: false, filter: 'none'
+            };
+            
+            finalizeLayerAddition(scene, newLayer, nWidth, nHeight);
+            loadingOverlay.style.display = 'none';
+        });
     };
 
     document.getElementById('upload-layer').addEventListener('change', (e) => {
@@ -720,42 +792,45 @@ try {
         e.target.value = '';
     });
 
+    // Modificato Save con Custom Modal
     document.getElementById('btn-save-project').onclick = () => {
         for (let s of scenes) {
             for (let l of s.layers) {
                 if (l.imgSrc && l.imgSrc.startsWith('blob:')) { showToast(`Attendi elaborazione per "${l.name}"`, "error"); return; }
             }
         }
-        const customFileName = prompt("Inserisci il nome del salvataggio:", "Campagna_Dnd");
-        if (!customFileName) return; 
-
-        loadingOverlay.style.display = 'flex';
-        document.getElementById('loading-text').innerText = "Salvataggio in corso...";
         
-        setTimeout(() => {
-            try {
-                const projectData = {
-                    sceneCounter: sceneCounter, layerCounter: layerCounter,
-                    scenes: scenes.map(scene => ({
-                        id: scene.id, name: scene.name, panX: scene.panX, panY: scene.panY, scale: scene.scale, cameraLocked: scene.cameraLocked || false,
-                        layers: scene.layers.map(layer => ({
-                            id: layer.id, name: layer.name, fileName: layer.fileName || "Media",
-                            imgSrc: layer.imgSrc, ytId: layer.ytId || null, nWidth: layer.nWidth, nHeight: layer.nHeight, fogRatio: layer.fogRatio,
-                            fogData: layer.canvas.toDataURL(), hlData: layer.hlCanvas.toDataURL(), x: layer.x, y: layer.y, scale: layer.scale, rotation: layer.rotation || 0, volume: layer.volume || 0,
-                            visible: layer.visible, lockMove: layer.lockMove, lockScale: layer.lockScale, isVideo: layer.isVideo || false,
-                            filter: layer.filter || 'none'
+        showCustomModal("Inserisci il nome del salvataggio:", true, "Campagna_Dnd", (customFileName) => {
+            if (!customFileName || customFileName.trim() === "") return; 
+
+            loadingOverlay.style.display = 'flex';
+            document.getElementById('loading-text').innerText = "Salvataggio in corso...";
+            
+            setTimeout(() => {
+                try {
+                    const projectData = {
+                        sceneCounter: sceneCounter, layerCounter: layerCounter,
+                        scenes: scenes.map(scene => ({
+                            id: scene.id, name: scene.name, panX: scene.panX, panY: scene.panY, scale: scene.scale, cameraLocked: scene.cameraLocked || false,
+                            layers: scene.layers.map(layer => ({
+                                id: layer.id, name: layer.name, fileName: layer.fileName || "Media",
+                                imgSrc: layer.imgSrc, ytId: layer.ytId || null, nWidth: layer.nWidth, nHeight: layer.nHeight, fogRatio: layer.fogRatio,
+                                fogData: layer.canvas.toDataURL(), hlData: layer.hlCanvas.toDataURL(), x: layer.x, y: layer.y, scale: layer.scale, rotation: layer.rotation || 0, volume: layer.volume || 0,
+                                visible: layer.visible, lockMove: layer.lockMove, lockScale: layer.lockScale, isVideo: layer.isVideo || false,
+                                filter: layer.filter || 'none'
+                            }))
                         }))
-                    }))
-                };
-                const blob = new Blob([JSON.stringify(projectData)], { type: "application/json" });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a'); a.href = url;
-                a.download = customFileName.endsWith('.json') ? customFileName : customFileName + ".json";
-                document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
-                showToast("Progetto salvato con successo!", "success");
-            } catch (error) { showToast("Errore durante il salvataggio.", "error"); }
-            loadingOverlay.style.display = 'none';
-        }, 100);
+                    };
+                    const blob = new Blob([JSON.stringify(projectData)], { type: "application/json" });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a'); a.href = url;
+                    a.download = customFileName.endsWith('.json') ? customFileName : customFileName + ".json";
+                    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+                    showToast("Progetto salvato con successo!", "success");
+                } catch (error) { showToast("Errore durante il salvataggio.", "error"); }
+                loadingOverlay.style.display = 'none';
+            }, 100);
+        });
     };
 
     document.getElementById('btn-load-trigger').onclick = () => document.getElementById('upload-project').click();
@@ -893,11 +968,15 @@ try {
             btnDel.innerHTML = '<span class="material-symbols-rounded">delete</span>';
             btnDel.onclick = (e) => { 
                 e.stopPropagation();
-                scene.layers = scene.layers.filter(l => l.id !== layer.id); 
-                if (activeLayerId === layer.id) activeLayerId = null; 
-                layer.wrapper.remove(); 
-                scene.layers.forEach(l => updateLayerTransform(l));
-                renderLayers(); 
+                showCustomModal(`Eliminare il livello "${layer.name}"?`, false, null, (yes) => {
+                    if(yes) {
+                        scene.layers = scene.layers.filter(l => l.id !== layer.id); 
+                        if (activeLayerId === layer.id) activeLayerId = null; 
+                        layer.wrapper.remove(); 
+                        scene.layers.forEach(l => updateLayerTransform(l));
+                        renderLayers(); 
+                    }
+                });
             };
 
             topBtns.appendChild(btnVis);
@@ -1023,18 +1102,6 @@ try {
     
     Object.keys(tools).forEach(mode => { if(tools[mode]) tools[mode].onclick = () => updateToolUI(mode); });
 
-    document.getElementById('clear-fog').onclick = () => { 
-        const scene = scenes.find(s => s.id === currentSceneId); const layer = scene?.layers.find(l => l.id === activeLayerId); 
-        if(layer) { layer.ctx.clearRect(0, 0, layer.canvas.width, layer.canvas.height); showToast("Nebbia pulita.", "success");} 
-        else showToast("Seleziona un livello!", "error"); 
-    };
-    
-    document.getElementById('fill-fog').onclick = () => { 
-        const scene = scenes.find(s => s.id === currentSceneId); const layer = scene?.layers.find(l => l.id === activeLayerId); 
-        if(layer) { layer.ctx.globalCompositeOperation = 'source-over'; layer.ctx.fillStyle = 'black'; layer.ctx.fillRect(0, 0, layer.canvas.width, layer.canvas.height); showToast("Livello coperto di nebbia.", "success");} 
-        else showToast("Seleziona un livello!", "error"); 
-    };
-
     function getPointerPos(e) { return (e.touches && e.touches.length > 0) ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : { x: e.clientX, y: e.clientY }; }
     function getDist(touches) { return Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY); }
     function getMid(touches) { return { x: (touches[0].clientX + touches[1].clientX) / 2, y: (touches[0].clientY + touches[1].clientY) / 2 }; }
@@ -1054,7 +1121,7 @@ try {
     }
 
     function handleStart(e) {
-        if(e.target.closest('.glass-panel') || e.target.closest('#reveal-ui') || e.target.closest('#toast-container')) return;
+        if(e.target.closest('.glass-panel') || e.target.closest('#reveal-ui') || e.target.closest('#toast-container') || e.target.closest('#custom-modal-overlay')) return;
         
         const currentTime = new Date().getTime();
         if (currentTime - lastTapTime < 300 && (!e.touches || e.touches.length === 1)) {
