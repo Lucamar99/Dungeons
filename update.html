@@ -1,0 +1,1200 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>D&D Tavolo Proiettore - V30 Mobile Ready</title>
+    <style>
+        /* --- RESET E BASE --- */
+        *, *::before, *::after { box-sizing: border-box; }
+        /* Rimosso touch-action: none da body per permettere lo scorrimento dei menu su mobile */
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #050505; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #eee; }
+        
+        /* --- MOTORE GRAFICO --- */
+        /* Applicato touch-action: none solo alla mappa per poter disegnare senza scrollare la pagina */
+        #viewport { position: relative; width: 100vw; height: 100vh; overflow: hidden; touch-action: none; }
+        #world-container { position: absolute; top: 0; left: 0; transform-origin: 0 0; will-change: transform; width: 0; height: 0; }
+        .layer-wrapper { position: absolute; top: 0; left: 0; transform-origin: center; will-change: transform; overflow: hidden; }
+        .layer-img { width: 100%; height: 100%; object-fit: fill; display: block; pointer-events: none; border: none; z-index: 1; }
+        .layer-atmosphere { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 2; transition: background 1.5s, mix-blend-mode 1.5s; }
+        .fog-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 3; }
+        .layer-drawings { position: absolute; top: 0; left: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; z-index: 4; }
+        
+        /* Ping Animato */
+        @keyframes ping-anim { 0% { transform: scale(0); opacity: 1; border-width: 10px; } 100% { transform: scale(4); opacity: 0; border-width: 1px; } }
+        .ping-marker { position: absolute; width: 60px; height: 60px; background: radial-gradient(circle, rgba(255,50,50,0.6) 0%, transparent 70%); border: 3px solid red; border-radius: 50%; transform-origin: center; animation: ping-anim 1.5s ease-out; pointer-events: none; z-index: 9999; margin-left: -30px; margin-top: -30px; }
+
+        /* Filtri Meteo & Atmosfera */
+        @keyframes pulse-fire { 0% { background: rgba(255, 60, 0, 0.25); } 100% { background: rgba(200, 20, 0, 0.4); } }
+        @keyframes rain-fall { 0% { background-position: 0px 0px, 0px 0px; } 100% { background-position: 100px 1000px, 50px 700px; } }
+        @keyframes snow-fall { 0% { background-position: 0px 0px, 0px 0px; } 100% { background-position: 100px 400px, -50px 600px; } }
+
+        .filter-night { background: rgba(0, 20, 60, 0.65); mix-blend-mode: multiply; }
+        .filter-fire { mix-blend-mode: color; animation: pulse-fire 2s infinite alternate; }
+        .filter-sepia { background: rgba(150, 100, 50, 0.35); mix-blend-mode: multiply; }
+        .filter-swamp { background: rgba(30, 80, 20, 0.5); mix-blend-mode: multiply; }
+        .filter-blood { background: rgba(120, 0, 0, 0.6); mix-blend-mode: multiply; }
+        .filter-rain { background-color: rgba(10, 20, 30, 0.15); background-image: url("data:image/svg+xml,%3Csvg width='300' height='300' xmlns='http://www.w3.org/2000/svg'%3E%3Cline x1='20' y1='20' x2='28' y2='60' stroke='rgba(220,230,255,0.3)' stroke-width='1.5' stroke-linecap='round'/%3E%3Cline x1='180' y1='100' x2='188' y2='140' stroke='rgba(220,230,255,0.2)' stroke-width='1.2' stroke-linecap='round'/%3E%3Cline x1='100' y1='220' x2='108' y2='260' stroke='rgba(220,230,255,0.25)' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E"), url("data:image/svg+xml,%3Csvg width='200' height='200' xmlns='http://www.w3.org/2000/svg'%3E%3Cline x1='50' y1='50' x2='54' y2='75' stroke='rgba(200,220,255,0.15)' stroke-width='1' stroke-linecap='round'/%3E%3Cline x1='150' y1='120' x2='154' y2='145' stroke='rgba(200,220,255,0.1)' stroke-width='0.8' stroke-linecap='round'/%3E%3C/svg%3E"); animation: rain-fall 0.5s linear infinite; }
+        .filter-snow { background-color: rgba(200, 220, 240, 0.15); background-image: url("data:image/svg+xml,%3Csvg width='50' height='50' viewBox='0 0 50 50' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='25' cy='25' r='2' fill='rgba(255,255,255,0.8)'/%3E%3C/svg%3E"), url("data:image/svg+xml,%3Csvg width='80' height='80' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='40' cy='40' r='3.5' fill='rgba(255,255,255,0.4)'/%3E%3C/svg%3E"); animation: snow-fall 4s linear infinite; }
+
+        #calibration-square { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); border: 4px solid #ff3333; background: rgba(255, 51, 51, 0.3); z-index: 1000; pointer-events: none; width: 50px; height: 50px; display: none; }
+
+        /* --- UI PREMIUM (GLASSMORPHISM) --- */
+        .glass-panel {
+            background: rgba(25, 30, 35, 0.75);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+            z-index: 950;
+            transition: opacity 0.3s ease;
+        }
+
+        /* TOOLBAR SINISTRA (Desktop) */
+        #left-toolbar {
+            position: absolute; top: 20px; left: 20px;
+            width: 64px; padding: 8px 0; border-radius: 16px;
+            display: flex; flex-direction: column; align-items: center; gap: 10px;
+            touch-action: pan-y;
+        }
+        
+        .toolbar-divider { width: 40px; height: 1px; background: rgba(255,255,255,0.15); margin: 4px 0; flex-shrink: 0; }
+
+        .tool-btn {
+            width: 44px; height: 44px; border-radius: 12px; border: none; cursor: pointer;
+            background: rgba(255,255,255,0.05); color: white; font-size: 20px; flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center;
+            transition: all 0.2s ease; outline: 2px solid transparent;
+        }
+        .tool-btn:hover { background: rgba(255,255,255,0.15); transform: translateY(-2px); }
+        .tool-btn:active { transform: translateY(0); }
+        .tool-btn.active { background: #007aff; box-shadow: 0 0 15px rgba(0, 122, 255, 0.5); outline: 2px solid #66b0ff; }
+        
+        .color-red { background: #ff3b30 !important; }
+        .color-green { background: #34c759 !important; }
+        .color-yellow { background: #ffcc00 !important; }
+        .color-btn.active { outline: 3px solid white; transform: scale(1.1); box-shadow: 0 0 12px currentColor; }
+
+        /* PANNELLO DESTRA (Desktop) */
+        #right-panel {
+            position: absolute; top: 20px; right: 20px;
+            width: 320px; max-height: calc(100vh - 40px);
+            border-radius: 16px; padding: 16px;
+            display: flex; flex-direction: column; gap: 12px;
+            overflow-y: auto; touch-action: pan-y;
+        }
+        #right-panel::-webkit-scrollbar { width: 6px; }
+        #right-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 10px; }
+
+        .panel-section { background: rgba(0,0,0,0.3); border-radius: 12px; padding: 12px; border: 1px solid rgba(255,255,255,0.05); flex-shrink: 0; }
+        .section-title { font-size: 11px; font-weight: 700; color: #8e8e93; text-transform: uppercase; margin-bottom: 10px; letter-spacing: 0.5px; }
+
+        .row { display: flex; gap: 8px; align-items: center; }
+        .row-btn { flex: 1; padding: 10px; border-radius: 8px; border: none; background: rgba(255,255,255,0.1); color: white; font-weight: 600; font-size: 13px; cursor: pointer; transition: 0.2s; }
+        .row-btn:hover { background: rgba(255,255,255,0.2); }
+        .btn-primary { background: #007aff; } .btn-primary:hover { background: #0066d6; }
+        .btn-success { background: #34c759; } .btn-success:hover { background: #2eb050; }
+        .btn-warning { background: #ff9500; color: black; } .btn-warning:hover { background: #e08300; }
+        .btn-danger { background: #ff3b30; } .btn-danger:hover { background: #d63026; }
+
+        label { font-size: 12px; color: #ccc; display: block; margin-bottom: 4px; }
+        input[type="range"] { width: 100%; margin: 5px 0 15px 0; accent-color: #007aff; }
+        select { width: 100%; background: rgba(0,0,0,0.5); color: white; border: 1px solid rgba(255,255,255,0.2); padding: 8px; border-radius: 8px; font-size: 13px; margin-bottom: 10px; outline: none; }
+
+        .list-container { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+        .item-row { display: flex; align-items: center; background: rgba(0,0,0,0.4); padding: 6px 8px; border-radius: 8px; border: 1px solid transparent; gap: 4px; }
+        .item-row.active { border-color: #34c759; background: rgba(52, 199, 89, 0.15); }
+        .item-name { flex: 1; font-size: 13px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+        .mini-btn { width: 28px; height: 28px; border-radius: 6px; border: none; background: rgba(255,255,255,0.1); color: white; font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .mini-btn:hover { background: rgba(255,255,255,0.25); }
+        .mini-btn.danger { color: #ff3b30; }
+        
+        .hidden { display: none !important; opacity: 0; pointer-events: none; }
+        
+        #reveal-ui { position: absolute; top: 20px; right: 20px; z-index: 1000; background: rgba(25,30,35,0.8); backdrop-filter: blur(10px); color: white; border-radius: 50%; width: 56px; height: 56px; font-size: 24px; border: 1px solid rgba(255,255,255,0.2); cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(0,0,0,0.5);}
+
+        /* TOAST NOTIFICATIONS */
+        #toast-container { position: fixed; top: 30px; left: 50%; transform: translateX(-50%); z-index: 9999; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
+        .toast { background: rgba(20, 20, 20, 0.95); backdrop-filter: blur(10px); border-radius: 30px; padding: 12px 24px; color: white; font-size: 14px; font-weight: 600; box-shadow: 0 10px 30px rgba(0,0,0,0.5); opacity: 0; transform: translateY(-20px); transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55); border: 1px solid rgba(255,255,255,0.1); }
+        .toast.show { opacity: 1; transform: translateY(0); }
+        .toast.error { border-color: #ff3b30; color: #ff453a; }
+        .toast.success { border-color: #34c759; color: #32d74b; }
+
+        #loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(5px); z-index: 2000; display: flex; justify-content: center; align-items: center; flex-direction: column; color: white; font-size: 18px; font-weight: bold; letter-spacing: 1px; display: none; }
+        .spinner { border: 4px solid rgba(255,255,255,0.1); border-top: 4px solid #007aff; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin-bottom: 20px; }
+
+        /* --- ADATTAMENTO MOBILE (SMARTPHONE E TABLET VERTICALI) --- */
+        @media (max-width: 768px) {
+            #left-toolbar {
+                top: auto;
+                bottom: 15px;
+                left: 50%;
+                transform: translateX(-50%);
+                width: calc(100vw - 30px);
+                flex-direction: row;
+                overflow-x: auto;
+                justify-content: flex-start;
+                padding: 8px 12px;
+                touch-action: pan-x;
+            }
+            #left-toolbar::-webkit-scrollbar { display: none; } /* Scrollbar nascosta per pulizia */
+            
+            .toolbar-divider {
+                width: 1px;
+                height: 30px;
+                margin: 0 4px;
+            }
+            
+            #right-panel {
+                top: 15px;
+                right: auto;
+                left: 50%;
+                transform: translateX(-50%);
+                width: calc(100vw - 30px);
+                max-height: calc(100vh - 110px); /* Lascia lo spazio per la toolbar in basso */
+            }
+            
+            .tool-btn {
+                min-width: 44px; /* Mantiene i pulsanti facili da tappare */
+            }
+            
+            #reveal-ui {
+                top: 15px;
+                right: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div id="loading-overlay"><div class="spinner"></div><div id="loading-text">Caricamento in corso...</div></div>
+<div id="toast-container"></div>
+<div id="atmosphere-overlay"></div>
+
+<div id="left-toolbar" class="glass-panel">
+    <button id="tool-camera" class="tool-btn active" title="Sposta Camera (Mappa)">🗺️</button>
+    <button id="tool-layer" class="tool-btn" title="Sposta Livello Selezionato">🎯</button>
+    <button id="btn-lock-camera" class="tool-btn" title="Blocca/Sblocca Camera">🔓</button>
+    
+    <div class="toolbar-divider"></div>
+    
+    <button id="tool-draw" class="tool-btn" title="Aggiungi Nebbia">☁️</button>
+    <button id="tool-erase" class="tool-btn" title="Cancella Nebbia (Torcia)">🧽</button>
+    <button id="fill-fog" class="tool-btn" title="Copri tutta la mappa">🌫️</button>
+    <button id="clear-fog" class="tool-btn" title="Pulisci tutta la nebbia">🧹</button>
+    
+    <div class="toolbar-divider"></div>
+    
+    <button id="tool-hl-red" class="tool-btn color-btn color-red" title="Evidenziatore Rosso"></button>
+    <button id="tool-hl-green" class="tool-btn color-btn color-green" title="Evidenziatore Verde"></button>
+    <button id="tool-hl-yellow" class="tool-btn color-btn color-yellow" title="Evidenziatore Giallo"></button>
+    <button id="clear-drawings" class="tool-btn" title="Cancella i disegni dal layer">🗑️</button>
+
+    <div class="toolbar-divider"></div>
+
+    <button id="btn-zoom-in" class="tool-btn" title="Zoom In">➕</button>
+    <button id="btn-zoom-out" class="tool-btn" title="Zoom Out">➖</button>
+</div>
+
+<div id="right-panel" class="glass-panel">
+    
+    <div class="row">
+        <button id="btn-save-project" class="row-btn btn-warning">💾 Salva</button>
+        <button id="btn-load-trigger" class="row-btn btn-primary">📂 Carica</button>
+        <input type="file" id="upload-project" accept=".json" class="hidden">
+    </div>
+
+    <div class="panel-section">
+        <div class="section-title">🎬 Scene & Mappe</div>
+        <div class="list-container" id="scene-list"></div>
+        <button id="btn-new-scene" class="row-btn btn-primary" style="width: 100%; margin-bottom:12px;">+ Nuova Scena</button>
+        
+        <div class="section-title">📑 Livelli della Scena</div>
+        <div class="row" style="margin-bottom: 8px;">
+            <button id="btn-upload-trigger" class="row-btn" style="background: rgba(255,255,255,0.15);">📁 Media</button>
+            <button id="btn-yt-layer" class="row-btn" style="background: rgba(255,59,48,0.8);">🔴 YouTube</button>
+            <input type="file" id="upload-layer" accept="image/*,video/*" class="hidden">
+        </div>
+        <div class="list-container" id="layer-list"></div>
+    </div>
+
+    <div class="panel-section">
+        <div class="section-title">⚙️ Regolazioni</div>
+        
+        <label>Spessore Pennello (Nebbia/Tratto):</label>
+        <input type="range" id="brush-size" min="10" max="300" value="80">
+
+        <label style="display:flex; justify-content:space-between;">Rotazione Layer: <span id="rot-display" style="color:#ffcc00;">0°</span></label>
+        <div class="row">
+            <input type="range" id="layer-rotation" min="0" max="360" value="0" style="flex:1; margin:0;">
+            <button id="btn-reset-rot" class="mini-btn" style="width:36px; height:30px;">0°</button>
+        </div>
+
+        <label style="display:flex; justify-content:space-between; margin-top:12px;">Volume Video: <span id="vol-display" style="color:#34c759;">0%</span></label>
+        <input type="range" id="layer-volume" min="0" max="100" value="0" disabled>
+    </div>
+
+    <div class="panel-section">
+        <div class="section-title">🌗 Atmosfera Layer</div>
+        <select id="atmosphere-select">
+            <option value="none">☀️ Sereno (Nessun filtro)</option>
+            <option value="night">🌙 Notte Oscura</option>
+            <option value="fire">🔥 Incendio / Pericolo</option>
+            <option value="rain">🌧️ Pioggia</option>
+            <option value="snow">❄️ Neve</option>
+            <option value="swamp">☠️ Palude</option>
+            <option value="blood">🩸 Sangue</option>
+            <option value="sepia">📜 Pergamena</option>
+        </select>
+
+        <div class="section-title" style="margin-top: 15px;">📐 Proiettore</div>
+        <button id="toggle-square" class="row-btn" style="width: 100%; margin-bottom:8px; border: 1px solid #ff9500;">Mostra Calibrazione Rossa</button>
+        <input type="range" id="square-size" min="1" max="1000" value="50">
+    </div>
+
+    <div class="row">
+        <button id="btn-fullscreen" class="row-btn" style="background:#5ac8fa; color:black;">🔲 Schermo Intero</button>
+        <button id="hide-ui" class="row-btn btn-success">Nascondi UI</button>
+    </div>
+    <div style="text-align: center; font-size: 10px; color: #888; margin-top: 4px;">(Doppio tap sulla mappa per nascondere i menu. Tieni premuto per il Ping!)</div>
+</div>
+
+<button id="reveal-ui" class="hidden">⚙️</button>
+<input type="file" id="upload-relink" accept="video/*" class="hidden">
+
+<div id="viewport">
+    <div id="world-container"></div>
+    <div id="calibration-square"></div>
+</div>
+
+<script>
+// --- SISTEMA DI NOTIFICHE TOAST ---
+function showToast(msg, type = 'info') {
+    const container = document.getElementById('toast-container');
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.innerText = msg;
+    container.appendChild(toast);
+    
+    requestAnimationFrame(() => {
+        toast.classList.add('show');
+    });
+
+    setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 400); 
+    }, 3000);
+}
+
+window.onerror = function(msg, url, lineNo) {
+    showToast("ERRORE: " + msg + " (Riga " + lineNo + ")", "error");
+    return false;
+};
+
+try {
+    let scenes = [];
+    let currentSceneId = null;
+    let activeLayerId = null; 
+    let sceneCounter = 0;
+    let layerCounter = 0;
+    const MAX_FOG_RES = 1500;
+    let layerToRelink = null;
+
+    const viewport = document.getElementById('viewport');
+    const worldContainer = document.getElementById('world-container');
+    const sceneListEl = document.getElementById('scene-list');
+    const layerListEl = document.getElementById('layer-list');
+    const loadingOverlay = document.getElementById('loading-overlay');
+    const btnLockCamera = document.getElementById('btn-lock-camera');
+    const rotSlider = document.getElementById('layer-rotation');
+    const volSlider = document.getElementById('layer-volume');
+    const calibSquare = document.getElementById('calibration-square');
+    
+    const rotDisplay = document.getElementById('rot-display');
+    const volDisplay = document.getElementById('vol-display');
+
+    let currentMode = 'camera'; 
+    let isInteracting = false;
+    let startX = 0, startY = 0;
+    let lastPinchDist = null, lastPinchMid = null;
+    let pendingDraw = false;
+    let drawLastX = 0, drawLastY = 0, drawCurrX = 0, drawCurrY = 0;
+    let lastTapTime = 0;
+    let isCinemaMode = false;
+    let pingTimer = null;
+    let currentPath = null;
+
+    function safeBase64ToBlobUrl(b64) {
+        if(!b64 || !b64.startsWith('data:')) return b64;
+        try {
+            const parts = b64.split(',');
+            const mime = parts[0].match(/:(.*?);/)[1];
+            const bstr = atob(parts[1]);
+            let n = bstr.length;
+            const u8arr = new Uint8Array(n);
+            while(n--){ u8arr[n] = bstr.charCodeAt(n); }
+            const blob = new Blob([u8arr], {type: mime});
+            return URL.createObjectURL(blob);
+        } catch(e) { return b64; }
+    }
+
+    function extractYouTubeID(url) {
+        const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+        const match = url.match(regExp);
+        return (match && match[2].length === 11) ? match[2] : null;
+    }
+
+    function applyLayerVolume(layer) {
+        if (!layer || (!layer.isVideo && !layer.ytId)) return;
+        const vol = layer.volume || 0;
+        if (layer.isVideo && layer.mediaEl) {
+            layer.mediaEl.volume = vol / 100;
+            layer.mediaEl.muted = vol === 0;
+        } else if (layer.ytId && layer.mediaEl && layer.mediaEl.contentWindow) {
+            if (vol > 0) {
+                layer.mediaEl.contentWindow.postMessage(JSON.stringify({ "event": "command", "func": "unMute", "args": [] }), "*");
+                layer.mediaEl.contentWindow.postMessage(JSON.stringify({ "event": "command", "func": "setVolume", "args": [vol] }), "*");
+            } else {
+                layer.mediaEl.contentWindow.postMessage(JSON.stringify({ "event": "command", "func": "mute", "args": [] }), "*");
+            }
+        }
+    }
+
+    function applyLayerAtmosphere(layer) {
+        if (!layer || !layer.atmosphereEl) return;
+        layer.atmosphereEl.className = 'layer-atmosphere'; 
+        if(layer.filter && layer.filter !== 'none') {
+            layer.atmosphereEl.classList.add(`filter-${layer.filter}`);
+        }
+    }
+
+    function renderLayerDrawings(layer) {
+        if (!layer || !layer.svg) return;
+        while (layer.svg.firstChild) {
+            layer.svg.removeChild(layer.svg.firstChild);
+        }
+        if (!layer.drawings) return;
+        
+        layer.drawings.forEach(path => {
+            const polyline = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+            polyline.setAttribute("fill", "none");
+            polyline.setAttribute("stroke", path.color);
+            polyline.setAttribute("stroke-width", path.width);
+            polyline.setAttribute("stroke-linecap", "round");
+            polyline.setAttribute("stroke-linejoin", "round");
+            polyline.setAttribute("opacity", "0.7");
+            const pointsStr = path.points.map(p => `${p.x},${p.y}`).join(" ");
+            polyline.setAttribute("points", pointsStr);
+            layer.svg.appendChild(polyline);
+        });
+    }
+
+    function triggerPing(worldX, worldY) {
+        const ping = document.createElement('div');
+        ping.className = 'ping-marker';
+        ping.style.left = worldX + 'px';
+        ping.style.top = worldY + 'px';
+        worldContainer.appendChild(ping);
+        setTimeout(() => { if(ping.parentNode) ping.remove(); }, 1500);
+    }
+
+    function createNewScene() {
+        sceneCounter++;
+        const newScene = { 
+            id: sceneCounter, name: `Scena ${sceneCounter}`, layers: [], 
+            panX: 0, panY: 0, scale: 1, cameraLocked: false
+        };
+        scenes.push(newScene);
+        switchScene(newScene.id);
+        renderSceneList();
+        showToast(`Creata nuova ${newScene.name}`, "success");
+    }
+
+    function switchScene(id) {
+        currentSceneId = id; activeLayerId = null; updateToolUI('camera');
+        const scene = scenes.find(s => s.id === id);
+        
+        renderSceneList();
+        
+        Array.from(worldContainer.children).forEach(c => {
+            if(!c.classList.contains('ping-marker')) c.remove();
+        });
+        
+        scene.layers.forEach(layer => { 
+            worldContainer.appendChild(layer.wrapper); 
+            updateLayerTransform(layer); 
+            applyLayerVolume(layer);
+            applyLayerAtmosphere(layer); 
+            renderLayerDrawings(layer);
+
+            if (layer.isVideo && layer.mediaEl) {
+                layer.mediaEl.play().catch(err => console.log("Autoplay error:", err));
+            }
+        });
+        
+        applyWorldTransform(scene.panX, scene.panY, scene.scale);
+        updateCameraLockUI(scene);
+        renderLayers();
+    }
+
+    function renameScene(id) {
+        const scene = scenes.find(s => s.id === id);
+        const newName = prompt("Inserisci il nuovo nome della scena:", scene.name);
+        if (newName) { scene.name = newName; renderSceneList(); }
+    }
+
+    function deleteScene(id) {
+        const scene = scenes.find(s => s.id === id);
+        if (confirm(`Eliminare definitivamente la scena "${scene.name}"?`)) {
+            scene.layers.forEach(l => { if(l.mediaEl) l.mediaEl.src = ""; });
+            scenes = scenes.filter(s => s.id !== id);
+            if (scenes.length === 0) createNewScene();
+            else if (currentSceneId === id) switchScene(scenes[0].id);
+            else renderSceneList();
+            showToast("Scena eliminata.", "error");
+        }
+    }
+
+    function updateCameraLockUI(scene) {
+        if (scene.cameraLocked) {
+            btnLockCamera.innerText = '🔒'; 
+            btnLockCamera.classList.add('color-red');
+        } else {
+            btnLockCamera.innerText = '🔓'; 
+            btnLockCamera.classList.remove('color-red');
+        }
+    }
+
+    function createLayerDOM(mediaSrc, naturalWidth, naturalHeight, fogRatio, existingFogData = null, isVideo = false, ytId = null) {
+        return new Promise((resolve) => {
+            let mediaEl;
+            
+            if (ytId) {
+                mediaEl = document.createElement('iframe');
+                let currentOrigin = window.location.origin;
+                if (!currentOrigin || currentOrigin === "null" || currentOrigin === "file://") { currentOrigin = "https://www.youtube.com"; }
+                mediaEl.src = `https://www.youtube.com/embed/${ytId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${ytId}&playsinline=1&modestbranding=1&origin=${currentOrigin}&enablejsapi=1`;
+                mediaEl.allow = "autoplay; encrypted-media";
+                mediaEl.setAttribute("referrerpolicy", "strict-origin-when-cross-origin");
+                mediaEl.style.backgroundColor = "#000";
+                setTimeout(finalizeDOM, 50); 
+            } else if (isVideo) {
+                mediaEl = document.createElement('video');
+                mediaEl.autoplay = true; mediaEl.loop = true; mediaEl.muted = true; mediaEl.playsInline = true;
+                mediaEl.style.backgroundColor = "#222"; 
+                mediaEl.addEventListener('timeupdate', function() {
+                    if (this.duration && this.currentTime >= this.duration - 0.15) { this.currentTime = 0; this.play(); }
+                });
+                if (mediaSrc) { mediaEl.onloadeddata = finalizeDOM; mediaEl.src = mediaSrc; mediaEl.load(); } 
+                else { setTimeout(finalizeDOM, 10); }
+            } else {
+                mediaEl = new Image();
+                if (mediaSrc) { mediaEl.onload = finalizeDOM; mediaEl.src = mediaSrc; } 
+                else { setTimeout(finalizeDOM, 10); }
+            }
+
+            function finalizeDOM() {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'layer-wrapper';
+                wrapper.style.width = naturalWidth + 'px'; 
+                wrapper.style.height = naturalHeight + 'px';
+                mediaEl.className = 'layer-img'; 
+                wrapper.appendChild(mediaEl);
+                
+                const atmosphere = document.createElement('div');
+                atmosphere.className = 'layer-atmosphere';
+                wrapper.appendChild(atmosphere);
+                
+                const canvas = document.createElement('canvas');
+                canvas.className = 'fog-canvas';
+                canvas.width = naturalWidth * fogRatio; 
+                canvas.height = naturalHeight * fogRatio;
+                const ctx = canvas.getContext('2d');
+                wrapper.appendChild(canvas);
+
+                const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+                svg.setAttribute("class", "layer-drawings");
+                svg.setAttribute("viewBox", `0 0 ${naturalWidth} ${naturalHeight}`);
+                wrapper.appendChild(svg);
+
+                if (existingFogData) {
+                    const fogImg = new Image();
+                    fogImg.onload = () => { ctx.drawImage(fogImg, 0, 0); resolve({ wrapper, canvas, ctx, mediaEl, atmosphereEl: atmosphere, svg }); };
+                    fogImg.src = existingFogData;
+                } else {
+                    resolve({ wrapper, canvas, ctx, mediaEl, atmosphereEl: atmosphere, svg });
+                }
+            }
+        });
+    }
+
+    function finalizeLayerAddition(scene, newLayer, nWidth, nHeight) {
+        if (scene.layers.length === 0) {
+            const scaleFit = Math.min(window.innerWidth / nWidth, window.innerHeight / nHeight);
+            scene.scale = scaleFit < 1 ? scaleFit : 1;
+            scene.panX = (window.innerWidth - (nWidth * scene.scale)) / 2;
+            scene.panY = (window.innerHeight - (nHeight * scene.scale)) / 2;
+            applyWorldTransform(scene.panX, scene.panY, scene.scale);
+        }
+
+        scene.layers.push(newLayer);
+        activeLayerId = newLayer.id; 
+        updateToolUI('layer');
+        worldContainer.appendChild(newLayer.wrapper);
+        
+        scene.layers.forEach(l => updateLayerTransform(l));
+        renderLayers();
+        applyLayerAtmosphere(newLayer);
+        showToast("Media aggiunto con successo!", "success");
+    }
+
+    function updateLayerTransform(layer) {
+        const rot = layer.rotation || 0;
+        layer.wrapper.style.transform = `translate(${layer.x}px, ${layer.y}px) scale(${layer.scale}) rotate(${rot}deg)`;
+        layer.wrapper.style.display = layer.visible ? 'block' : 'none';
+        
+        const scene = scenes.find(s => s.id === currentSceneId);
+        if (scene) {
+            layer.wrapper.style.zIndex = scene.layers.indexOf(layer);
+        }
+    }
+
+    function renameLayer(id) {
+        const scene = scenes.find(s => s.id === currentSceneId);
+        const layer = scene.layers.find(l => l.id === id);
+        const newName = prompt("Inserisci il nuovo nome del livello:", layer.name);
+        if (newName) { layer.name = newName; renderLayers(); }
+    }
+
+    // --- EVENT LISTENERS UI ---
+
+    document.getElementById('atmosphere-select').onchange = (e) => {
+        const scene = scenes.find(s => s.id === currentSceneId);
+        const layer = scene?.layers.find(l => l.id === activeLayerId);
+        if(layer) { 
+            layer.filter = e.target.value; 
+            applyLayerAtmosphere(layer); 
+        } else {
+            showToast("Seleziona prima un livello per applicare un filtro meteo.", "error");
+            e.target.value = 'none';
+        }
+    };
+    
+    document.getElementById('clear-drawings').onclick = () => {
+        const scene = scenes.find(s => s.id === currentSceneId);
+        const layer = scene?.layers.find(l => l.id === activeLayerId);
+        if(layer) { 
+            layer.drawings = []; 
+            renderLayerDrawings(layer); 
+            showToast("Disegni rimossi.", "success");
+        } else {
+            showToast("Seleziona un livello da pulire.", "error");
+        }
+    };
+
+    btnLockCamera.onclick = () => {
+        const scene = scenes.find(s => s.id === currentSceneId);
+        if (!scene) return;
+        scene.cameraLocked = !scene.cameraLocked;
+        updateCameraLockUI(scene);
+        showToast(scene.cameraLocked ? "Mappa bloccata" : "Mappa sbloccata");
+    };
+
+    document.getElementById('btn-upload-trigger').onclick = () => document.getElementById('upload-layer').click();
+
+    document.getElementById('btn-yt-layer').onclick = async () => {
+        const url = prompt("Incolla qui il link del video di YouTube:");
+        if (!url) return;
+        const ytId = extractYouTubeID(url);
+        if (!ytId) { showToast("Link non valido!", "error"); return; }
+
+        const scene = scenes.find(s => s.id === currentSceneId);
+        if (!scene) return;
+
+        loadingOverlay.style.display = 'flex';
+        const nWidth = 1920; const nHeight = 1080;
+        const fogRatio = MAX_FOG_RES / Math.max(nWidth, nHeight);
+
+        const domElements = await createLayerDOM(null, nWidth, nHeight, fogRatio, null, false, ytId);
+
+        layerCounter++;
+        const newLayer = {
+            id: layerCounter, name: `YouTube Mappa`, fileName: `YT: ${ytId}`, imgSrc: null, ytId: ytId, 
+            nWidth: nWidth, nHeight: nHeight, wrapper: domElements.wrapper, canvas: domElements.canvas, ctx: domElements.ctx, mediaEl: domElements.mediaEl, atmosphereEl: domElements.atmosphereEl, svg: domElements.svg,
+            fogRatio: fogRatio, x: 0, y: 0, scale: 1, rotation: 0, volume: 0, visible: true, lockMove: false, lockScale: false,
+            isVideo: false, needsRelink: false, drawings: [], filter: 'none'
+        };
+        
+        finalizeLayerAddition(scene, newLayer, nWidth, nHeight);
+        loadingOverlay.style.display = 'none';
+    };
+
+    document.getElementById('upload-layer').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        const scene = scenes.find(s => s.id === currentSceneId);
+        if (!file || !scene) return;
+        
+        const isVideo = file.type.startsWith('video/');
+        const objectUrl = URL.createObjectURL(file);
+        loadingOverlay.style.display = 'flex';
+        
+        const processMedia = async (nWidth, nHeight) => {
+            const fogRatio = Math.max(nWidth, nHeight) > MAX_FOG_RES ? MAX_FOG_RES / Math.max(nWidth, nHeight) : 1;
+            const domElements = await createLayerDOM(objectUrl, nWidth, nHeight, fogRatio, null, isVideo);
+
+            layerCounter++;
+            const newLayer = {
+                id: layerCounter, name: `Livello ${scene.layers.length + 1}`, fileName: file.name, imgSrc: isVideo ? null : objectUrl, ytId: null,
+                nWidth: nWidth, nHeight: nHeight, wrapper: domElements.wrapper, canvas: domElements.canvas, ctx: domElements.ctx, mediaEl: domElements.mediaEl, atmosphereEl: domElements.atmosphereEl, svg: domElements.svg,
+                fogRatio: fogRatio, x: 0, y: 0, scale: 1, rotation: 0, volume: 0, visible: true, lockMove: false, lockScale: false,
+                isVideo: isVideo, needsRelink: false, drawings: [], filter: 'none'
+            };
+            
+            finalizeLayerAddition(scene, newLayer, nWidth, nHeight);
+            loadingOverlay.style.display = 'none';
+            e.target.value = '';
+
+            if (!isVideo) {
+                const reader = new FileReader();
+                reader.onload = (ev) => { newLayer.imgSrc = ev.target.result; };
+                reader.readAsDataURL(file);
+            }
+        };
+
+        if (isVideo) {
+            const tempVid = document.createElement('video');
+            tempVid.onloadedmetadata = () => { processMedia(tempVid.videoWidth, tempVid.videoHeight); };
+            tempVid.src = objectUrl;
+        } else {
+            const tempImg = new Image();
+            tempImg.onload = () => { processMedia(tempImg.naturalWidth, tempImg.naturalHeight); };
+            tempImg.src = objectUrl;
+        }
+    });
+
+    rotSlider.addEventListener('input', (e) => {
+        const scene = scenes.find(s => s.id === currentSceneId);
+        const layer = scene?.layers.find(l => l.id === activeLayerId);
+        if(layer) {
+            layer.rotation = parseFloat(e.target.value);
+            rotDisplay.innerText = layer.rotation + "°";
+            updateLayerTransform(layer);
+        }
+    });
+
+    document.getElementById('btn-reset-rot').onclick = () => {
+        const scene = scenes.find(s => s.id === currentSceneId);
+        const layer = scene?.layers.find(l => l.id === activeLayerId);
+        if(layer) {
+            layer.rotation = 0;
+            rotSlider.value = 0;
+            rotDisplay.innerText = "0°";
+            updateLayerTransform(layer);
+        }
+    };
+
+    volSlider.addEventListener('input', (e) => {
+        const scene = scenes.find(s => s.id === currentSceneId);
+        const layer = scene?.layers.find(l => l.id === activeLayerId);
+        if(layer && (layer.isVideo || layer.ytId)) {
+            layer.volume = parseInt(e.target.value);
+            volDisplay.innerText = layer.volume + "%";
+            applyLayerVolume(layer);
+        }
+    });
+
+    document.getElementById('upload-relink').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file || !layerToRelink) return;
+        const objectUrl = URL.createObjectURL(file);
+        layerToRelink.mediaEl.src = objectUrl;
+        layerToRelink.mediaEl.load();
+        layerToRelink.needsRelink = false; 
+        setTimeout(() => applyLayerVolume(layerToRelink), 500);
+        layerToRelink = null;
+        renderLayers();
+        e.target.value = '';
+    });
+
+    document.getElementById('btn-save-project').onclick = () => {
+        for (let s of scenes) {
+            for (let l of s.layers) {
+                if (l.imgSrc && l.imgSrc.startsWith('blob:')) { showToast(`Attendi elaborazione background per "${l.name}"`, "error"); return; }
+            }
+        }
+        const customFileName = prompt("Inserisci il nome del salvataggio:", "Campagna_Dnd");
+        if (!customFileName) return; 
+
+        loadingOverlay.style.display = 'flex';
+        document.getElementById('loading-text').innerText = "Salvataggio in corso...";
+        
+        setTimeout(() => {
+            try {
+                const projectData = {
+                    sceneCounter: sceneCounter, layerCounter: layerCounter,
+                    scenes: scenes.map(scene => ({
+                        id: scene.id, name: scene.name, panX: scene.panX, panY: scene.panY, scale: scene.scale, cameraLocked: scene.cameraLocked || false,
+                        layers: scene.layers.map(layer => ({
+                            id: layer.id, name: layer.name, fileName: layer.fileName || "Media",
+                            imgSrc: layer.imgSrc, ytId: layer.ytId || null, nWidth: layer.nWidth, nHeight: layer.nHeight, fogRatio: layer.fogRatio,
+                            fogData: layer.canvas.toDataURL(), x: layer.x, y: layer.y, scale: layer.scale, rotation: layer.rotation || 0, volume: layer.volume || 0,
+                            visible: layer.visible, lockMove: layer.lockMove, lockScale: layer.lockScale, isVideo: layer.isVideo || false,
+                            drawings: layer.drawings || [], filter: layer.filter || 'none'
+                        }))
+                    }))
+                };
+                const blob = new Blob([JSON.stringify(projectData)], { type: "application/json" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a'); a.href = url;
+                a.download = customFileName.endsWith('.json') ? customFileName : customFileName + ".json";
+                document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+                showToast("Progetto salvato con successo!", "success");
+            } catch (error) { showToast("Errore durante il salvataggio.", "error"); }
+            loadingOverlay.style.display = 'none';
+        }, 100);
+    };
+
+    document.getElementById('btn-load-trigger').onclick = () => document.getElementById('upload-project').click();
+
+    document.getElementById('upload-project').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        loadingOverlay.style.display = 'flex'; document.getElementById('loading-text').innerText = "Caricamento mappa...";
+        
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+            try {
+                await new Promise(resolve => setTimeout(resolve, 50));
+                const data = JSON.parse(event.target.result);
+                scenes = []; worldContainer.innerHTML = ''; sceneCounter = data.sceneCounter; layerCounter = data.layerCounter;
+                
+                const base64ToBlobUrl = async (b64) => {
+                    if(!b64 || !b64.startsWith('data:')) return b64;
+                    const res = await fetch(b64); const blob = await res.blob(); return URL.createObjectURL(blob);
+                };
+
+                for (const sceneData of data.scenes) {
+                    const newScene = {
+                        id: sceneData.id, name: sceneData.name, panX: sceneData.panX, panY: sceneData.panY, scale: sceneData.scale, cameraLocked: sceneData.cameraLocked || false,
+                        layers: []
+                    };
+
+                    for (const layerData of sceneData.layers) {
+                        const isVid = layerData.isVideo || false; const ytId = layerData.ytId || null;
+                        const needsRelink = isVid && !layerData.imgSrc && !ytId; 
+                        const domSrc = safeBase64ToBlobUrl(layerData.imgSrc);
+                        const domFog = layerData.fogData ? safeBase64ToBlobUrl(layerData.fogData) : null;
+
+                        const domElements = await createLayerDOM(domSrc, layerData.nWidth, layerData.nHeight, layerData.fogRatio, domFog, isVid, ytId);
+                        
+                        const createdLayer = {
+                            id: layerData.id, name: layerData.name, fileName: layerData.fileName,
+                            imgSrc: layerData.imgSrc, ytId: ytId, nWidth: layerData.nWidth, nHeight: layerData.nHeight, fogRatio: layerData.fogRatio,
+                            wrapper: domElements.wrapper, canvas: domElements.canvas, ctx: domElements.ctx, mediaEl: domElements.mediaEl, atmosphereEl: domElements.atmosphereEl, svg: domElements.svg,
+                            x: layerData.x, y: layerData.y, scale: layerData.scale, rotation: layerData.rotation || 0, volume: layerData.volume || 0,
+                            visible: layerData.visible, lockMove: layerData.lockMove || false, lockScale: layerData.lockScale || false,
+                            isVideo: isVid, needsRelink: needsRelink, drawings: layerData.drawings || [], filter: layerData.filter || 'none'
+                        };
+                        newScene.layers.push(createdLayer);
+                        renderLayerDrawings(createdLayer);
+                        applyLayerAtmosphere(createdLayer);
+                        setTimeout(() => applyLayerVolume(createdLayer), 1500);
+                    }
+                    scenes.push(newScene);
+                }
+                if (scenes.length > 0) switchScene(scenes[0].id);
+                showToast("Campagna caricata con successo!", "success");
+
+            } catch (error) { showToast("Errore: File non valido.", "error"); console.error(error); }
+            loadingOverlay.style.display = 'none'; e.target.value = '';
+        };
+        reader.readAsText(file);
+    });
+
+    function renderSceneList() {
+        sceneListEl.innerHTML = '';
+        scenes.forEach(scene => {
+            const row = document.createElement('div'); row.className = `item-row ${scene.id === currentSceneId ? 'active' : ''}`;
+            const nameEl = document.createElement('div'); nameEl.className = 'item-name'; nameEl.innerText = scene.name; nameEl.onclick = () => switchScene(scene.id);
+            const btnEdit = document.createElement('button'); btnEdit.className = 'mini-btn'; btnEdit.innerText = '✏️'; btnEdit.onclick = () => renameScene(scene.id);
+            const btnDel = document.createElement('button'); btnDel.className = 'mini-btn danger'; btnDel.innerText = '🗑️'; btnDel.onclick = () => deleteScene(scene.id);
+            row.appendChild(nameEl); row.appendChild(btnEdit); row.appendChild(btnDel); sceneListEl.appendChild(row);
+        });
+    }
+
+    function renderLayers() {
+        const scene = scenes.find(s => s.id === currentSceneId);
+        layerListEl.innerHTML = '';
+        
+        if (!scene) {
+            rotSlider.value = 0; rotDisplay.innerText = "0°";
+            volSlider.value = 0; volDisplay.innerText = "0%"; volSlider.disabled = true; 
+            document.getElementById('atmosphere-select').value = 'none';
+            return;
+        }
+
+        if (activeLayerId) {
+            const activeL = scene.layers.find(l => l.id === activeLayerId);
+            if (activeL) {
+                rotSlider.value = activeL.rotation || 0; rotDisplay.innerText = (activeL.rotation || 0) + "°";
+                document.getElementById('atmosphere-select').value = activeL.filter || 'none';
+                if(activeL.isVideo || activeL.ytId) {
+                    volSlider.disabled = false; volSlider.value = activeL.volume || 0; volDisplay.innerText = (activeL.volume || 0) + "%";
+                } else {
+                    volSlider.disabled = true; volSlider.value = 0; volDisplay.innerText = "0%";
+                }
+            }
+        } else {
+            rotSlider.value = 0; rotDisplay.innerText = "0°";
+            volSlider.value = 0; volDisplay.innerText = "0%"; volSlider.disabled = true;
+            document.getElementById('atmosphere-select').value = 'none';
+        }
+
+        [...scene.layers].reverse().forEach(layer => {
+            const row = document.createElement('div'); row.className = `item-row ${layer.id === activeLayerId ? 'active' : ''}`;
+            
+            const nameEl = document.createElement('div'); 
+            nameEl.className = 'item-name'; 
+            nameEl.innerText = layer.name + (layer.ytId ? " 🔴" : (layer.isVideo ? " 🎥" : "")); 
+            nameEl.onclick = () => { activeLayerId = layer.id; if(currentMode === 'camera') updateToolUI('layer'); else renderLayers(); };
+            
+            const btnUp = document.createElement('button'); btnUp.className = 'mini-btn'; btnUp.innerText = '🔼'; btnUp.title = "Sposta Su";
+            btnUp.onclick = (e) => { 
+                e.stopPropagation(); 
+                const idx = scene.layers.indexOf(layer);
+                if (idx < scene.layers.length - 1) {
+                    scene.layers[idx] = scene.layers[idx + 1];
+                    scene.layers[idx + 1] = layer;
+                    scene.layers.forEach(l => updateLayerTransform(l));
+                    renderLayers();
+                }
+            };
+            
+            const btnDown = document.createElement('button'); btnDown.className = 'mini-btn'; btnDown.innerText = '🔽'; btnDown.title = "Sposta Giù";
+            btnDown.onclick = (e) => { 
+                e.stopPropagation(); 
+                const idx = scene.layers.indexOf(layer);
+                if (idx > 0) {
+                    scene.layers[idx] = scene.layers[idx - 1];
+                    scene.layers[idx - 1] = layer;
+                    scene.layers.forEach(l => updateLayerTransform(l));
+                    renderLayers();
+                }
+            };
+
+            const btnVis = document.createElement('button'); btnVis.className = `mini-btn ${layer.visible ? '' : 'danger'}`; btnVis.innerText = layer.visible ? '👁️' : '❌'; 
+            btnVis.title = "Visibilità"; btnVis.onclick = (e) => { e.stopPropagation(); layer.visible = !layer.visible; updateLayerTransform(layer); renderLayers(); };
+            
+            const btnLockMove = document.createElement('button'); btnLockMove.className = `mini-btn ${layer.lockMove ? 'danger' : ''}`; btnLockMove.innerText = layer.lockMove ? '📍' : '✋'; 
+            btnLockMove.title = "Blocca Movimento"; btnLockMove.onclick = (e) => { e.stopPropagation(); layer.lockMove = !layer.lockMove; renderLayers(); };
+
+            const btnLockScale = document.createElement('button'); btnLockScale.className = `mini-btn ${layer.lockScale ? 'danger' : ''}`; btnLockScale.innerText = layer.lockScale ? '🔒' : '🔎'; 
+            btnLockScale.title = "Blocca Zoom"; btnLockScale.onclick = (e) => { e.stopPropagation(); layer.lockScale = !layer.lockScale; renderLayers(); };
+            
+            const btnRename = document.createElement('button'); btnRename.className = 'mini-btn'; btnRename.innerText = '✏️'; btnRename.onclick = (e) => { e.stopPropagation(); renameLayer(layer.id); };
+            const btnDel = document.createElement('button'); btnDel.className = 'mini-btn danger'; btnDel.innerText = '🗑️'; 
+            btnDel.onclick = (e) => { 
+                e.stopPropagation();
+                scene.layers = scene.layers.filter(l => l.id !== layer.id); 
+                if (activeLayerId === layer.id) activeLayerId = null; 
+                layer.wrapper.remove(); 
+                scene.layers.forEach(l => updateLayerTransform(l));
+                renderLayers(); 
+            };
+
+            row.appendChild(nameEl); 
+            row.appendChild(btnUp); 
+            row.appendChild(btnDown);
+            row.appendChild(btnVis); 
+            row.appendChild(btnLockMove); 
+            row.appendChild(btnLockScale); 
+            row.appendChild(btnRename); 
+            row.appendChild(btnDel);
+            
+            if (layer.needsRelink) {
+                const btnRelink = document.createElement('button'); btnRelink.className = 'btn-relink'; btnRelink.innerText = `🎥 Ricarica: ${layer.fileName}`;
+                btnRelink.onclick = (e) => { e.stopPropagation(); layerToRelink = layer; document.getElementById('upload-relink').click(); };
+                row.appendChild(btnRelink);
+            }
+            layerListEl.appendChild(row);
+        });
+    }
+
+    function applyWorldTransform(x, y, s) {
+        const scene = scenes.find(sc => sc.id === currentSceneId);
+        if(scene) { scene.panX = x; scene.panY = y; scene.scale = s; }
+        worldContainer.style.transform = `translate(${x}px, ${y}px) scale(${s})`;
+    }
+
+    function scaleLayer(layer, factor, centerX, centerY, scene) {
+        if (layer.lockScale) return;
+        const worldX = (centerX - scene.panX) / scene.scale; const worldY = (centerY - scene.panY) / scene.scale;
+        const cx = layer.x + layer.nWidth / 2; const cy = layer.y + layer.nHeight / 2;
+        const dx = (worldX - cx); const dy = (worldY - cy);
+        const newScale = Math.max(0.01, Math.min(layer.scale * factor, 50)); 
+        const actualFactor = newScale / layer.scale;
+        layer.scale = newScale;
+        layer.x = (worldX - dx * actualFactor) - layer.nWidth / 2;
+        layer.y = (worldY - dy * actualFactor) - layer.nHeight / 2;
+        updateLayerTransform(layer);
+    }
+
+    function doGlobalZoom(factor, centerX = window.innerWidth/2, centerY = window.innerHeight/2) {
+        const scene = scenes.find(sc => sc.id === currentSceneId);
+        if (!scene || scene.cameraLocked) return; 
+        const worldX = (centerX - scene.panX) / scene.scale; const worldY = (centerY - scene.panY) / scene.scale;
+        let newScale = Math.max(0.05, Math.min(scene.scale * factor, 15));
+        applyWorldTransform(centerX - (worldX * newScale), centerY - (worldY * newScale), newScale);
+    }
+
+    document.getElementById('btn-zoom-in').onclick = () => doGlobalZoom(1.2);
+    document.getElementById('btn-zoom-out').onclick = () => doGlobalZoom(0.8);
+    
+    viewport.addEventListener('wheel', (e) => { 
+        e.preventDefault(); 
+        const factor = e.deltaY < 0 ? 1.1 : 0.9;
+        const scene = scenes.find(sc => sc.id === currentSceneId);
+        const activeLayer = scene?.layers.find(l => l.id === activeLayerId);
+        if (currentMode === 'layer' && activeLayer) scaleLayer(activeLayer, factor, e.clientX, e.clientY, scene);
+        else doGlobalZoom(factor, e.clientX, e.clientY);
+    }, {passive: false});
+
+    const tools = { 
+        'camera': document.getElementById('tool-camera'), 'layer': document.getElementById('tool-layer'), 
+        'draw': document.getElementById('tool-draw'), 'erase': document.getElementById('tool-erase'),
+        'hl-red': document.getElementById('tool-hl-red'), 'hl-green': document.getElementById('tool-hl-green'), 'hl-yellow': document.getElementById('tool-hl-yellow')
+    };
+    
+    function updateToolUI(mode) {
+        currentMode = mode;
+        Object.values(tools).forEach(btn => { if(btn) btn.classList.remove('active'); });
+        if(tools[mode]) tools[mode].classList.add('active');
+        if ((mode === 'layer' || mode === 'draw' || mode === 'erase') && !activeLayerId) {
+            const scene = scenes.find(s => s.id === currentSceneId);
+            if (scene && scene.layers.length > 0) { activeLayerId = scene.layers[scene.layers.length - 1].id; renderLayers(); }
+        }
+    }
+    
+    Object.keys(tools).forEach(mode => { if(tools[mode]) tools[mode].onclick = () => updateToolUI(mode); });
+
+    document.getElementById('clear-fog').onclick = () => { 
+        const scene = scenes.find(s => s.id === currentSceneId); const layer = scene?.layers.find(l => l.id === activeLayerId); 
+        if(layer) { layer.ctx.clearRect(0, 0, layer.canvas.width, layer.canvas.height); showToast("Nebbia pulita.", "success");} 
+        else showToast("Seleziona un livello!", "error"); 
+    };
+    
+    document.getElementById('fill-fog').onclick = () => { 
+        const scene = scenes.find(s => s.id === currentSceneId); const layer = scene?.layers.find(l => l.id === activeLayerId); 
+        if(layer) { layer.ctx.globalCompositeOperation = 'source-over'; layer.ctx.fillStyle = 'black'; layer.ctx.fillRect(0, 0, layer.canvas.width, layer.canvas.height); showToast("Livello coperto di nebbia.", "success");} 
+        else showToast("Seleziona un livello!", "error"); 
+    };
+
+    function getPointerPos(e) { return (e.touches && e.touches.length > 0) ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : { x: e.clientX, y: e.clientY }; }
+    function getDist(touches) { return Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY); }
+    function getMid(touches) { return { x: (touches[0].clientX + touches[1].clientX) / 2, y: (touches[0].clientY + touches[1].clientY) / 2 }; }
+
+    function getWorldCoords(screenX, screenY, scene) {
+        return { x: (screenX - scene.panX) / scene.scale, y: (screenY - scene.panY) / scene.scale };
+    }
+
+    function getLayerLocalCoordsRaw(screenX, screenY, scene, layer) {
+        const worldCoords = getWorldCoords(screenX, screenY, scene);
+        const cx = layer.x + layer.nWidth / 2; const cy = layer.y + layer.nHeight / 2;
+        const dx = (worldCoords.x - cx) / layer.scale; const dy = (worldCoords.y - cy) / layer.scale;
+        const rad = (layer.rotation || 0) * Math.PI / 180;
+        const localX = (layer.nWidth / 2) + dx * Math.cos(rad) + dy * Math.sin(rad);
+        const localY = (layer.nHeight / 2) - dx * Math.sin(rad) + dy * Math.cos(rad);
+        return { x: localX, y: localY };
+    }
+
+    function performDraw() {
+        if (!isInteracting || (currentMode !== 'draw' && currentMode !== 'erase')) { pendingDraw = false; return; }
+        const scene = scenes.find(s => s.id === currentSceneId);
+        const layer = scene?.layers.find(l => l.id === activeLayerId);
+        if(layer) { layer.ctx.beginPath(); layer.ctx.moveTo(drawLastX, drawLastY); layer.ctx.lineTo(drawCurrX, drawCurrY); layer.ctx.stroke(); }
+        drawLastX = drawCurrX; drawLastY = drawCurrY;
+        pendingDraw = false;
+    }
+
+    function handleStart(e) {
+        if(e.target.closest('.glass-panel') || e.target.closest('#reveal-ui')) return;
+        
+        const currentTime = new Date().getTime();
+        if (currentTime - lastTapTime < 300 && (!e.touches || e.touches.length === 1)) {
+            toggleCinemaMode(); e.preventDefault(); return;
+        }
+        lastTapTime = currentTime;
+
+        if(!currentSceneId) return;
+        e.preventDefault();
+        
+        const scene = scenes.find(s => s.id === currentSceneId);
+        const activeLayer = scene.layers.find(l => l.id === activeLayerId);
+        isInteracting = true;
+
+        if (e.touches && e.touches.length === 2) {
+            lastPinchDist = getDist(e.touches); lastPinchMid = getMid(e.touches); return;
+        }
+
+        const pos = getPointerPos(e);
+
+        pingTimer = setTimeout(() => {
+            isInteracting = false; currentPath = null;
+            const wPos = getWorldCoords(pos.x, pos.y, scene);
+            triggerPing(wPos.x, wPos.y);
+        }, 500);
+
+        if (currentMode === 'camera') {
+            if (scene.cameraLocked) return; 
+            startX = pos.x - scene.panX; startY = pos.y - scene.panY;
+        } else if (currentMode === 'layer' && activeLayer) {
+            if (!activeLayer.lockMove) {
+                startX = ((pos.x - scene.panX) / scene.scale) - activeLayer.x; startY = ((pos.y - scene.panY) / scene.scale) - activeLayer.y;
+            }
+        } else if (currentMode.startsWith('hl-') && activeLayer) {
+            const rawPos = getLayerLocalCoordsRaw(pos.x, pos.y, scene, activeLayer);
+            const colorMap = { 'hl-red': '#ff3b30', 'hl-green': '#34c759', 'hl-yellow': '#ffcc00' };
+            const brushThickness = document.getElementById('brush-size').value / scene.scale / activeLayer.scale;
+            currentPath = { color: colorMap[currentMode], width: brushThickness, points: [rawPos] };
+            if (!activeLayer.drawings) activeLayer.drawings = [];
+            activeLayer.drawings.push(currentPath);
+            renderLayerDrawings(activeLayer);
+        } else if ((currentMode === 'draw' || currentMode === 'erase') && activeLayer) {
+            const rawPos = getLayerLocalCoordsRaw(pos.x, pos.y, scene, activeLayer);
+            activeLayer.ctx.lineWidth = (document.getElementById('brush-size').value / scene.scale / activeLayer.scale) * activeLayer.fogRatio;
+            activeLayer.ctx.lineCap = 'round'; activeLayer.ctx.lineJoin = 'round';
+            activeLayer.ctx.globalCompositeOperation = currentMode === 'draw' ? 'source-over' : 'destination-out';
+            activeLayer.ctx.strokeStyle = 'black';
+            drawCurrX = rawPos.x * activeLayer.fogRatio; 
+            drawCurrY = rawPos.y * activeLayer.fogRatio;
+            drawLastX = drawCurrX; drawLastY = drawCurrY;
+            activeLayer.ctx.beginPath(); activeLayer.ctx.moveTo(drawCurrX, drawCurrY); activeLayer.ctx.lineTo(drawCurrX+0.1, drawCurrY+0.1); activeLayer.ctx.stroke();
+        }
+    }
+
+    function handleMove(e) {
+        if(pingTimer) { clearTimeout(pingTimer); pingTimer = null; }
+        if (!isInteracting) return;
+        e.preventDefault();
+        const scene = scenes.find(s => s.id === currentSceneId);
+        const activeLayer = scene?.layers.find(l => l.id === activeLayerId);
+
+        if (e.touches && e.touches.length === 2) {
+            const currentDist = getDist(e.touches); const currentMid = getMid(e.touches);
+            if (lastPinchDist) {
+                const zoomFactor = currentDist / lastPinchDist;
+                if (currentMode === 'layer' && activeLayer) {
+                    scaleLayer(activeLayer, zoomFactor, currentMid.x, currentMid.y, scene);
+                } else {
+                    if (scene.cameraLocked) return; 
+                    const worldX = (currentMid.x - scene.panX) / scene.scale; const worldY = (currentMid.y - scene.panY) / scene.scale;
+                    let newScale = Math.max(0.05, Math.min(scene.scale * zoomFactor, 15));
+                    applyWorldTransform(currentMid.x - (worldX * newScale), currentMid.y - (worldY * newScale), newScale);
+                }
+            }
+            lastPinchDist = currentDist; lastPinchMid = currentMid; return;
+        }
+
+        const pos = getPointerPos(e);
+        if (currentMode === 'camera') {
+            if (scene.cameraLocked) return; 
+            applyWorldTransform(pos.x - startX, pos.y - startY, scene.scale);
+        } else if (currentMode === 'layer' && activeLayer) {
+            if (!activeLayer.lockMove) {
+                activeLayer.x = ((pos.x - scene.panX) / scene.scale) - startX; 
+                activeLayer.y = ((pos.y - scene.panY) / scene.scale) - startY; 
+                updateLayerTransform(activeLayer);
+            }
+        } else if (currentMode.startsWith('hl-') && currentPath && activeLayer) {
+            const rawPos = getLayerLocalCoordsRaw(pos.x, pos.y, scene, activeLayer);
+            currentPath.points.push(rawPos);
+            
+            if (!pendingDraw) {
+                pendingDraw = true;
+                requestAnimationFrame(() => {
+                    if (currentPath && activeLayer && activeLayer.svg) {
+                        const polylines = activeLayer.svg.querySelectorAll('polyline');
+                        if (polylines.length > 0) {
+                            const lastPoly = polylines[polylines.length - 1];
+                            lastPoly.setAttribute("points", currentPath.points.map(p => `${p.x},${p.y}`).join(" "));
+                        }
+                    }
+                    pendingDraw = false;
+                });
+            }
+        } else if ((currentMode === 'draw' || currentMode === 'erase') && activeLayer) {
+            const rawPos = getLayerLocalCoordsRaw(pos.x, pos.y, scene, activeLayer);
+            drawCurrX = rawPos.x * activeLayer.fogRatio; 
+            drawCurrY = rawPos.y * activeLayer.fogRatio;
+            if (!pendingDraw) {
+                pendingDraw = true;
+                requestAnimationFrame(() => {
+                    activeLayer.ctx.beginPath(); activeLayer.ctx.moveTo(drawLastX, drawLastY); activeLayer.ctx.lineTo(drawCurrX, drawCurrY); activeLayer.ctx.stroke();
+                    drawLastX = drawCurrX; drawLastY = drawCurrY; pendingDraw = false;
+                });
+            }
+        }
+    }
+
+    function handleEnd(e) {
+        if(pingTimer) { clearTimeout(pingTimer); pingTimer = null; }
+        if (e.touches && e.touches.length < 2) { lastPinchDist = null; lastPinchMid = null; }
+        isInteracting = false; currentPath = null;
+    }
+
+    viewport.addEventListener('mousedown', handleStart); viewport.addEventListener('mousemove', handleMove); window.addEventListener('mouseup', handleEnd);
+    viewport.addEventListener('touchstart', handleStart, {passive: false}); viewport.addEventListener('touchmove', handleMove, {passive: false});
+    window.addEventListener('touchend', handleEnd); window.addEventListener('touchcancel', handleEnd);
+    
+    viewport.addEventListener('dblclick', (e) => {
+        if(e.target.closest('.glass-panel') || e.target.closest('#reveal-ui')) return;
+        toggleCinemaMode();
+    });
+
+    document.getElementById('btn-fullscreen').onclick = () => {
+        if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(err => console.log(err));
+        else if (document.exitFullscreen) document.exitFullscreen();
+    };
+
+    const leftToolbar = document.getElementById('left-toolbar');
+    const rightPanel = document.getElementById('right-panel');
+    const revealUiBtn = document.getElementById('reveal-ui');
+
+    document.getElementById('hide-ui').onclick = () => { 
+        leftToolbar.classList.add('hidden'); 
+        rightPanel.classList.add('hidden'); 
+        revealUiBtn.classList.remove('hidden'); 
+        isCinemaMode = true; 
+    };
+    
+    revealUiBtn.onclick = () => { 
+        leftToolbar.classList.remove('hidden'); 
+        rightPanel.classList.remove('hidden'); 
+        revealUiBtn.classList.add('hidden'); 
+        isCinemaMode = false; 
+    };
+
+    function toggleCinemaMode() {
+        isCinemaMode = !isCinemaMode;
+        if (isCinemaMode) { 
+            leftToolbar.classList.add('hidden'); 
+            rightPanel.classList.add('hidden'); 
+            revealUiBtn.classList.add('hidden'); 
+        } else { 
+            revealUiBtn.classList.remove('hidden'); 
+        }
+    }
+
+    document.getElementById('toggle-square').onclick = () => calibSquare.style.display = (calibSquare.style.display === 'none' || calibSquare.style.display === '') ? 'block' : 'none';
+    document.getElementById('square-size').oninput = (e) => { calibSquare.style.width = e.target.value + 'px'; calibSquare.style.height = e.target.value + 'px'; };
+
+    document.getElementById('btn-new-scene').onclick = createNewScene;
+    createNewScene();
+
+} catch (e) {
+    showToast("ERRORE GRAVE: " + e.message, "error");
+    console.error(e);
+}
+</script>
+</body>
+</html>
