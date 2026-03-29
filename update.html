@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>D&D Tavolo Proiettore - V35 Layout Fix</title>
+    <title>D&D Tavolo Proiettore - V36 Final UI</title>
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
     <style>
         /* --- RESET E BASE --- */
@@ -79,10 +79,11 @@
             max-height: calc(100vh - 40px); 
             overflow-y: auto; 
             touch-action: pan-y;
-            overscroll-behavior: contain; /* Evita lo scroll della pagina sottostante */
+            overscroll-behavior: contain; 
+            scrollbar-width: none; /* Nasconde scrollbar su Firefox */
+            -ms-overflow-style: none; /* Nasconde scrollbar su IE e Edge */
         }
-        #right-panel::-webkit-scrollbar { width: 6px; }
-        #right-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.25); border-radius: 10px; }
+        #right-panel::-webkit-scrollbar { display: none; /* Nasconde scrollbar su Chrome, Safari e Opera */ }
 
         /* ACCORDIONS */
         .acc-group { display: flex; flex-direction: column; width: 100%; border-radius: 12px; overflow: hidden; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); flex-shrink: 0;}
@@ -112,15 +113,14 @@
         .color-swatch:hover { transform: scale(1.1); }
         .color-swatch.active { border-color: white; transform: scale(1.2); box-shadow: 0 0 12px currentColor; }
 
-        /* CARDS (Scene e Layer) CON SCROLL INDIPENDENTE */
+        /* CARDS (Scene e Layer) CON SCROLL INDIPENDENTE (Scrollbar nascosta) */
         .list-container { 
             display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; 
-            max-height: 35vh; /* Se ci sono troppi livelli, scrolla internamente! */
+            max-height: 35vh; 
             overflow-y: auto; overscroll-behavior: contain;
-            padding-right: 4px;
+            scrollbar-width: none; -ms-overflow-style: none;
         }
-        .list-container::-webkit-scrollbar { width: 4px; }
-        .list-container::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.25); border-radius: 4px; }
+        .list-container::-webkit-scrollbar { display: none; }
 
         .scene-item, .layer-item-container { display: flex; flex-direction: column; background: rgba(0,0,0,0.4); padding: 10px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05); gap: 10px; transition: 0.2s; cursor: pointer; flex-shrink: 0; }
         .scene-item.active, .layer-item-container.active { border-color: rgba(10, 132, 255, 0.6); background: rgba(10, 132, 255, 0.15); box-shadow: 0 0 15px rgba(10, 132, 255, 0.1); }
@@ -159,15 +159,15 @@
 
         /* ADATTAMENTO MOBILE */
         @media (max-width: 768px) {
-            #left-toolbar { top: auto; bottom: 15px; left: 50%; transform: translateX(-50%); width: calc(100vw - 30px); flex-direction: row; overflow-x: auto; justify-content: flex-start; padding: 10px 14px; touch-action: pan-x; border-radius: 24px; }
+            #left-toolbar { top: auto; bottom: 15px; left: 50%; transform: translateX(-50%); width: calc(100vw - 30px); flex-direction: row; overflow-x: auto; justify-content: flex-start; padding: 10px 14px; touch-action: pan-x; border-radius: 24px; scrollbar-width: none; -ms-overflow-style: none; }
             #left-toolbar::-webkit-scrollbar { display: none; }
             .toolbar-divider { width: 1px; height: 36px; margin: 0 6px; }
             
             #right-panel { 
                 top: 15px; right: auto; left: 50%; transform: translateX(-50%); 
                 width: calc(100vw - 30px); 
-                max-height: calc(100vh - 100px); /* Lascia spazio alla toolbar sotto */
-                padding-bottom: 24px; /* Imbottitura di sicurezza extra per fare scrollare l'ultimo elemento (Volume) in alto */
+                max-height: calc(100vh - 100px); 
+                padding-bottom: 24px; 
             }
             #reveal-ui { top: 15px; right: 15px; }
         }
