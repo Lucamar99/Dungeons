@@ -3,22 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>D&D Tavolo Proiettore - V30 Mobile Ready</title>
+    <title>D&D Tavolo Proiettore - V31 Ultimate UI</title>
     <style>
         /* --- RESET E BASE --- */
         *, *::before, *::after { box-sizing: border-box; }
-        /* Rimosso touch-action: none da body per permettere lo scorrimento dei menu su mobile */
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #050505; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #eee; }
         
         /* --- MOTORE GRAFICO --- */
-        /* Applicato touch-action: none solo alla mappa per poter disegnare senza scrollare la pagina */
         #viewport { position: relative; width: 100vw; height: 100vh; overflow: hidden; touch-action: none; }
         #world-container { position: absolute; top: 0; left: 0; transform-origin: 0 0; will-change: transform; width: 0; height: 0; }
         .layer-wrapper { position: absolute; top: 0; left: 0; transform-origin: center; will-change: transform; overflow: hidden; }
+        
+        /* Gerarchia Z-index interna al layer */
         .layer-img { width: 100%; height: 100%; object-fit: fill; display: block; pointer-events: none; border: none; z-index: 1; }
         .layer-atmosphere { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 2; transition: background 1.5s, mix-blend-mode 1.5s; }
         .fog-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 3; }
-        .layer-drawings { position: absolute; top: 0; left: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; z-index: 4; }
+        .hl-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 4; opacity: 0.8; }
         
         /* Ping Animato */
         @keyframes ping-anim { 0% { transform: scale(0); opacity: 1; border-width: 10px; } 100% { transform: scale(4); opacity: 0; border-width: 1px; } }
@@ -69,11 +69,6 @@
         .tool-btn:hover { background: rgba(255,255,255,0.15); transform: translateY(-2px); }
         .tool-btn:active { transform: translateY(0); }
         .tool-btn.active { background: #007aff; box-shadow: 0 0 15px rgba(0, 122, 255, 0.5); outline: 2px solid #66b0ff; }
-        
-        .color-red { background: #ff3b30 !important; }
-        .color-green { background: #34c759 !important; }
-        .color-yellow { background: #ffcc00 !important; }
-        .color-btn.active { outline: 3px solid white; transform: scale(1.1); box-shadow: 0 0 12px currentColor; }
 
         /* PANNELLO DESTRA (Desktop) */
         #right-panel {
@@ -101,10 +96,21 @@
         input[type="range"] { width: 100%; margin: 5px 0 15px 0; accent-color: #007aff; }
         select { width: 100%; background: rgba(0,0,0,0.5); color: white; border: 1px solid rgba(255,255,255,0.2); padding: 8px; border-radius: 8px; font-size: 13px; margin-bottom: 10px; outline: none; }
 
-        .list-container { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
-        .item-row { display: flex; align-items: center; background: rgba(0,0,0,0.4); padding: 6px 8px; border-radius: 8px; border: 1px solid transparent; gap: 4px; }
-        .item-row.active { border-color: #34c759; background: rgba(52, 199, 89, 0.15); }
-        .item-name { flex: 1; font-size: 13px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+        /* Palette Colori Evidenziatore */
+        .color-swatch { width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; transition: 0.2s; flex-shrink: 0; }
+        .color-swatch:hover { transform: scale(1.1); }
+        .color-swatch.active { border-color: white; transform: scale(1.15); box-shadow: 0 0 10px currentColor; }
+
+        /* Blocchi Layer Ridisegnati (2 Righe) */
+        .list-container { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+        .layer-item-container { display: flex; flex-direction: column; background: rgba(0,0,0,0.4); padding: 8px; border-radius: 8px; border: 1px solid transparent; gap: 8px; transition: 0.2s; cursor: pointer; }
+        .layer-item-container.active { border-color: #34c759; background: rgba(52, 199, 89, 0.15); }
+        
+        .layer-top-row { display: flex; justify-content: space-between; align-items: center; width: 100%; }
+        .layer-bottom-row { display: flex; justify-content: flex-start; align-items: center; width: 100%; gap: 6px; }
+        
+        .layer-name-wrap { flex: 1; font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 10px;}
+        
         .mini-btn { width: 28px; height: 28px; border-radius: 6px; border: none; background: rgba(255,255,255,0.1); color: white; font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
         .mini-btn:hover { background: rgba(255,255,255,0.25); }
         .mini-btn.danger { color: #ff3b30; }
@@ -123,45 +129,22 @@
         #loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(5px); z-index: 2000; display: flex; justify-content: center; align-items: center; flex-direction: column; color: white; font-size: 18px; font-weight: bold; letter-spacing: 1px; display: none; }
         .spinner { border: 4px solid rgba(255,255,255,0.1); border-top: 4px solid #007aff; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin-bottom: 20px; }
 
-        /* --- ADATTAMENTO MOBILE (SMARTPHONE E TABLET VERTICALI) --- */
+        /* --- ADATTAMENTO MOBILE --- */
         @media (max-width: 768px) {
             #left-toolbar {
-                top: auto;
-                bottom: 15px;
-                left: 50%;
-                transform: translateX(-50%);
-                width: calc(100vw - 30px);
-                flex-direction: row;
-                overflow-x: auto;
-                justify-content: flex-start;
-                padding: 8px 12px;
-                touch-action: pan-x;
+                top: auto; bottom: 15px; left: 50%; transform: translateX(-50%);
+                width: calc(100vw - 30px); flex-direction: row; overflow-x: auto;
+                justify-content: flex-start; padding: 8px 12px; touch-action: pan-x;
             }
-            #left-toolbar::-webkit-scrollbar { display: none; } /* Scrollbar nascosta per pulizia */
-            
-            .toolbar-divider {
-                width: 1px;
-                height: 30px;
-                margin: 0 4px;
-            }
+            #left-toolbar::-webkit-scrollbar { display: none; }
+            .toolbar-divider { width: 1px; height: 30px; margin: 0 4px; }
             
             #right-panel {
-                top: 15px;
-                right: auto;
-                left: 50%;
-                transform: translateX(-50%);
-                width: calc(100vw - 30px);
-                max-height: calc(100vh - 110px); /* Lascia lo spazio per la toolbar in basso */
+                top: 15px; right: auto; left: 50%; transform: translateX(-50%);
+                width: calc(100vw - 30px); max-height: calc(100vh - 110px);
             }
-            
-            .tool-btn {
-                min-width: 44px; /* Mantiene i pulsanti facili da tappare */
-            }
-            
-            #reveal-ui {
-                top: 15px;
-                right: 15px;
-            }
+            .tool-btn { min-width: 44px; }
+            #reveal-ui { top: 15px; right: 15px; }
         }
     </style>
 </head>
@@ -185,15 +168,8 @@
     
     <div class="toolbar-divider"></div>
     
-    <button id="tool-hl-red" class="tool-btn color-btn color-red" title="Evidenziatore Rosso"></button>
-    <button id="tool-hl-green" class="tool-btn color-btn color-green" title="Evidenziatore Verde"></button>
-    <button id="tool-hl-yellow" class="tool-btn color-btn color-yellow" title="Evidenziatore Giallo"></button>
-    <button id="clear-drawings" class="tool-btn" title="Cancella i disegni dal layer">🗑️</button>
-
-    <div class="toolbar-divider"></div>
-
-    <button id="btn-zoom-in" class="tool-btn" title="Zoom In">➕</button>
-    <button id="btn-zoom-out" class="tool-btn" title="Zoom Out">➖</button>
+    <button id="tool-hl-draw" class="tool-btn" title="Disegna Evidenziatore">🖍️</button>
+    <button id="tool-hl-erase" class="tool-btn" title="Gomma Evidenziatore">🧽🖍️</button>
 </div>
 
 <div id="right-panel" class="glass-panel">
@@ -219,12 +195,26 @@
     </div>
 
     <div class="panel-section">
-        <div class="section-title">⚙️ Regolazioni</div>
+        <div class="section-title">⚙️ Regolazioni Strumenti</div>
         
-        <label>Spessore Pennello (Nebbia/Tratto):</label>
+        <label>Colore Evidenziatore:</label>
+        <div class="row" id="hl-color-picker" style="margin-bottom: 12px; justify-content: space-between;">
+            <button class="color-swatch active" data-color="#ff3b30" style="background:#ff3b30;" title="Rosso"></button>
+            <button class="color-swatch" data-color="#34c759" style="background:#34c759;" title="Verde"></button>
+            <button class="color-swatch" data-color="#ffcc00" style="background:#ffcc00;" title="Giallo"></button>
+            <button class="color-swatch" data-color="#5ac8fa" style="background:#5ac8fa;" title="Azzurro"></button>
+            <button class="color-swatch" data-color="#ff2d55" style="background:#ff2d55;" title="Rosa"></button>
+            <button class="color-swatch" data-color="#ffffff" style="background:#ffffff;" title="Bianco"></button>
+        </div>
+
+        <label>Spessore Nebbia / Tratto:</label>
         <input type="range" id="brush-size" min="10" max="300" value="80">
 
-        <label style="display:flex; justify-content:space-between;">Rotazione Layer: <span id="rot-display" style="color:#ffcc00;">0°</span></label>
+        <button id="clear-drawings" class="row-btn btn-danger" style="width:100%; margin-bottom: 15px;">🗑️ Pulisci i Disegni dal Layer</button>
+
+        <div class="section-title">⚙️ Regolazioni Layer</div>
+
+        <label style="display:flex; justify-content:space-between;">Rotazione: <span id="rot-display" style="color:#ffcc00;">0°</span></label>
         <div class="row">
             <input type="range" id="layer-rotation" min="0" max="360" value="0" style="flex:1; margin:0;">
             <button id="btn-reset-rot" class="mini-btn" style="width:36px; height:30px;">0°</button>
@@ -299,6 +289,7 @@ try {
     let layerCounter = 0;
     const MAX_FOG_RES = 1500;
     let layerToRelink = null;
+    let currentHlColor = '#ff3b30'; // Colore iniziale evidenziatore
 
     const viewport = document.getElementById('viewport');
     const worldContainer = document.getElementById('world-container');
@@ -322,7 +313,6 @@ try {
     let lastTapTime = 0;
     let isCinemaMode = false;
     let pingTimer = null;
-    let currentPath = null;
 
     function safeBase64ToBlobUrl(b64) {
         if(!b64 || !b64.startsWith('data:')) return b64;
@@ -368,27 +358,6 @@ try {
         }
     }
 
-    function renderLayerDrawings(layer) {
-        if (!layer || !layer.svg) return;
-        while (layer.svg.firstChild) {
-            layer.svg.removeChild(layer.svg.firstChild);
-        }
-        if (!layer.drawings) return;
-        
-        layer.drawings.forEach(path => {
-            const polyline = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
-            polyline.setAttribute("fill", "none");
-            polyline.setAttribute("stroke", path.color);
-            polyline.setAttribute("stroke-width", path.width);
-            polyline.setAttribute("stroke-linecap", "round");
-            polyline.setAttribute("stroke-linejoin", "round");
-            polyline.setAttribute("opacity", "0.7");
-            const pointsStr = path.points.map(p => `${p.x},${p.y}`).join(" ");
-            polyline.setAttribute("points", pointsStr);
-            layer.svg.appendChild(polyline);
-        });
-    }
-
     function triggerPing(worldX, worldY) {
         const ping = document.createElement('div');
         ping.className = 'ping-marker';
@@ -425,7 +394,6 @@ try {
             updateLayerTransform(layer); 
             applyLayerVolume(layer);
             applyLayerAtmosphere(layer); 
-            renderLayerDrawings(layer);
 
             if (layer.isVideo && layer.mediaEl) {
                 layer.mediaEl.play().catch(err => console.log("Autoplay error:", err));
@@ -465,7 +433,8 @@ try {
         }
     }
 
-    function createLayerDOM(mediaSrc, naturalWidth, naturalHeight, fogRatio, existingFogData = null, isVideo = false, ytId = null) {
+    // --- NUOVA GENERAZIONE DOM CON DOPPIO CANVAS (Nebbia + Evidenziatore) ---
+    function createLayerDOM(mediaSrc, naturalWidth, naturalHeight, fogRatio, existingFogData = null, existingHlData = null, isVideo = false, ytId = null) {
         return new Promise((resolve) => {
             let mediaEl;
             
@@ -477,7 +446,6 @@ try {
                 mediaEl.allow = "autoplay; encrypted-media";
                 mediaEl.setAttribute("referrerpolicy", "strict-origin-when-cross-origin");
                 mediaEl.style.backgroundColor = "#000";
-                setTimeout(finalizeDOM, 50); 
             } else if (isVideo) {
                 mediaEl = document.createElement('video');
                 mediaEl.autoplay = true; mediaEl.loop = true; mediaEl.muted = true; mediaEl.playsInline = true;
@@ -485,46 +453,47 @@ try {
                 mediaEl.addEventListener('timeupdate', function() {
                     if (this.duration && this.currentTime >= this.duration - 0.15) { this.currentTime = 0; this.play(); }
                 });
-                if (mediaSrc) { mediaEl.onloadeddata = finalizeDOM; mediaEl.src = mediaSrc; mediaEl.load(); } 
-                else { setTimeout(finalizeDOM, 10); }
+                if (mediaSrc) { mediaEl.src = mediaSrc; mediaEl.load(); } 
             } else {
                 mediaEl = new Image();
-                if (mediaSrc) { mediaEl.onload = finalizeDOM; mediaEl.src = mediaSrc; } 
-                else { setTimeout(finalizeDOM, 10); }
+                if (mediaSrc) { mediaEl.src = mediaSrc; } 
             }
 
-            function finalizeDOM() {
-                const wrapper = document.createElement('div');
-                wrapper.className = 'layer-wrapper';
-                wrapper.style.width = naturalWidth + 'px'; 
-                wrapper.style.height = naturalHeight + 'px';
-                mediaEl.className = 'layer-img'; 
-                wrapper.appendChild(mediaEl);
-                
-                const atmosphere = document.createElement('div');
-                atmosphere.className = 'layer-atmosphere';
-                wrapper.appendChild(atmosphere);
-                
-                const canvas = document.createElement('canvas');
-                canvas.className = 'fog-canvas';
-                canvas.width = naturalWidth * fogRatio; 
-                canvas.height = naturalHeight * fogRatio;
-                const ctx = canvas.getContext('2d');
-                wrapper.appendChild(canvas);
+            const wrapper = document.createElement('div');
+            wrapper.className = 'layer-wrapper';
+            wrapper.style.width = naturalWidth + 'px'; 
+            wrapper.style.height = naturalHeight + 'px';
+            mediaEl.className = 'layer-img'; 
+            wrapper.appendChild(mediaEl);
+            
+            const atmosphere = document.createElement('div');
+            atmosphere.className = 'layer-atmosphere';
+            wrapper.appendChild(atmosphere);
+            
+            // Canvas Nebbia
+            const canvas = document.createElement('canvas');
+            canvas.className = 'fog-canvas';
+            canvas.width = naturalWidth * fogRatio; 
+            canvas.height = naturalHeight * fogRatio;
+            const ctx = canvas.getContext('2d');
+            wrapper.appendChild(canvas);
 
-                const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-                svg.setAttribute("class", "layer-drawings");
-                svg.setAttribute("viewBox", `0 0 ${naturalWidth} ${naturalHeight}`);
-                wrapper.appendChild(svg);
+            // NUOVO Canvas Evidenziatore (Stessa risoluzione, sta sopra la nebbia)
+            const hlCanvas = document.createElement('canvas');
+            hlCanvas.className = 'hl-canvas';
+            hlCanvas.width = naturalWidth * fogRatio; 
+            hlCanvas.height = naturalHeight * fogRatio;
+            const hlCtx = hlCanvas.getContext('2d');
+            wrapper.appendChild(hlCanvas);
 
-                if (existingFogData) {
-                    const fogImg = new Image();
-                    fogImg.onload = () => { ctx.drawImage(fogImg, 0, 0); resolve({ wrapper, canvas, ctx, mediaEl, atmosphereEl: atmosphere, svg }); };
-                    fogImg.src = existingFogData;
-                } else {
-                    resolve({ wrapper, canvas, ctx, mediaEl, atmosphereEl: atmosphere, svg });
-                }
-            }
+            // Caricamento asincrono per non bloccare se ci sono vecchi salvataggi
+            let fogPromise = existingFogData ? new Promise(r => { let img = new Image(); img.onload = () => { ctx.drawImage(img, 0, 0); r(); }; img.src = existingFogData; }) : Promise.resolve();
+            let hlPromise = existingHlData ? new Promise(r => { let img = new Image(); img.onload = () => { hlCtx.drawImage(img, 0, 0); r(); }; img.src = existingHlData; }) : Promise.resolve();
+            let mediaPromise = (!ytId && mediaSrc) ? new Promise(r => { if(isVideo) { mediaEl.onloadeddata = r; } else { mediaEl.onload = r; } }) : Promise.resolve();
+
+            Promise.all([fogPromise, hlPromise, mediaPromise]).then(() => {
+                resolve({ wrapper, canvas, ctx, hlCanvas, hlCtx, mediaEl, atmosphereEl: atmosphere });
+            });
         });
     }
 
@@ -568,6 +537,16 @@ try {
 
     // --- EVENT LISTENERS UI ---
 
+    // Palette Colori
+    document.querySelectorAll('.color-swatch').forEach(btn => {
+        btn.onclick = () => {
+            document.querySelectorAll('.color-swatch').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            currentHlColor = btn.dataset.color;
+            updateToolUI('hl-draw'); // Passa automaticamente allo strumento disegno
+        };
+    });
+
     document.getElementById('atmosphere-select').onchange = (e) => {
         const scene = scenes.find(s => s.id === currentSceneId);
         const layer = scene?.layers.find(l => l.id === activeLayerId);
@@ -584,9 +563,8 @@ try {
         const scene = scenes.find(s => s.id === currentSceneId);
         const layer = scene?.layers.find(l => l.id === activeLayerId);
         if(layer) { 
-            layer.drawings = []; 
-            renderLayerDrawings(layer); 
-            showToast("Disegni rimossi.", "success");
+            layer.hlCtx.clearRect(0, 0, layer.hlCanvas.width, layer.hlCanvas.height); 
+            showToast("Disegni rimossi dal livello.", "success");
         } else {
             showToast("Seleziona un livello da pulire.", "error");
         }
@@ -615,14 +593,14 @@ try {
         const nWidth = 1920; const nHeight = 1080;
         const fogRatio = MAX_FOG_RES / Math.max(nWidth, nHeight);
 
-        const domElements = await createLayerDOM(null, nWidth, nHeight, fogRatio, null, false, ytId);
+        const domElements = await createLayerDOM(null, nWidth, nHeight, fogRatio, null, null, false, ytId);
 
         layerCounter++;
         const newLayer = {
             id: layerCounter, name: `YouTube Mappa`, fileName: `YT: ${ytId}`, imgSrc: null, ytId: ytId, 
-            nWidth: nWidth, nHeight: nHeight, wrapper: domElements.wrapper, canvas: domElements.canvas, ctx: domElements.ctx, mediaEl: domElements.mediaEl, atmosphereEl: domElements.atmosphereEl, svg: domElements.svg,
+            nWidth: nWidth, nHeight: nHeight, wrapper: domElements.wrapper, canvas: domElements.canvas, ctx: domElements.ctx, hlCanvas: domElements.hlCanvas, hlCtx: domElements.hlCtx, mediaEl: domElements.mediaEl, atmosphereEl: domElements.atmosphereEl,
             fogRatio: fogRatio, x: 0, y: 0, scale: 1, rotation: 0, volume: 0, visible: true, lockMove: false, lockScale: false,
-            isVideo: false, needsRelink: false, drawings: [], filter: 'none'
+            isVideo: false, needsRelink: false, filter: 'none'
         };
         
         finalizeLayerAddition(scene, newLayer, nWidth, nHeight);
@@ -640,14 +618,14 @@ try {
         
         const processMedia = async (nWidth, nHeight) => {
             const fogRatio = Math.max(nWidth, nHeight) > MAX_FOG_RES ? MAX_FOG_RES / Math.max(nWidth, nHeight) : 1;
-            const domElements = await createLayerDOM(objectUrl, nWidth, nHeight, fogRatio, null, isVideo);
+            const domElements = await createLayerDOM(objectUrl, nWidth, nHeight, fogRatio, null, null, isVideo);
 
             layerCounter++;
             const newLayer = {
                 id: layerCounter, name: `Livello ${scene.layers.length + 1}`, fileName: file.name, imgSrc: isVideo ? null : objectUrl, ytId: null,
-                nWidth: nWidth, nHeight: nHeight, wrapper: domElements.wrapper, canvas: domElements.canvas, ctx: domElements.ctx, mediaEl: domElements.mediaEl, atmosphereEl: domElements.atmosphereEl, svg: domElements.svg,
+                nWidth: nWidth, nHeight: nHeight, wrapper: domElements.wrapper, canvas: domElements.canvas, ctx: domElements.ctx, hlCanvas: domElements.hlCanvas, hlCtx: domElements.hlCtx, mediaEl: domElements.mediaEl, atmosphereEl: domElements.atmosphereEl,
                 fogRatio: fogRatio, x: 0, y: 0, scale: 1, rotation: 0, volume: 0, visible: true, lockMove: false, lockScale: false,
-                isVideo: isVideo, needsRelink: false, drawings: [], filter: 'none'
+                isVideo: isVideo, needsRelink: false, filter: 'none'
             };
             
             finalizeLayerAddition(scene, newLayer, nWidth, nHeight);
@@ -716,6 +694,7 @@ try {
         e.target.value = '';
     });
 
+    // SALVATAGGIO AGGIORNATO (Include hlData per i disegni canvas)
     document.getElementById('btn-save-project').onclick = () => {
         for (let s of scenes) {
             for (let l of s.layers) {
@@ -737,9 +716,9 @@ try {
                         layers: scene.layers.map(layer => ({
                             id: layer.id, name: layer.name, fileName: layer.fileName || "Media",
                             imgSrc: layer.imgSrc, ytId: layer.ytId || null, nWidth: layer.nWidth, nHeight: layer.nHeight, fogRatio: layer.fogRatio,
-                            fogData: layer.canvas.toDataURL(), x: layer.x, y: layer.y, scale: layer.scale, rotation: layer.rotation || 0, volume: layer.volume || 0,
+                            fogData: layer.canvas.toDataURL(), hlData: layer.hlCanvas.toDataURL(), x: layer.x, y: layer.y, scale: layer.scale, rotation: layer.rotation || 0, volume: layer.volume || 0,
                             visible: layer.visible, lockMove: layer.lockMove, lockScale: layer.lockScale, isVideo: layer.isVideo || false,
-                            drawings: layer.drawings || [], filter: layer.filter || 'none'
+                            filter: layer.filter || 'none'
                         }))
                     }))
                 };
@@ -756,6 +735,7 @@ try {
 
     document.getElementById('btn-load-trigger').onclick = () => document.getElementById('upload-project').click();
 
+    // CARICAMENTO AGGIORNATO (Include caricamento hlData)
     document.getElementById('upload-project').addEventListener('change', (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -784,19 +764,21 @@ try {
                         const needsRelink = isVid && !layerData.imgSrc && !ytId; 
                         const domSrc = safeBase64ToBlobUrl(layerData.imgSrc);
                         const domFog = layerData.fogData ? safeBase64ToBlobUrl(layerData.fogData) : null;
+                        
+                        // Compatibilità retroattiva per file senza hlData
+                        const domHl = layerData.hlData ? safeBase64ToBlobUrl(layerData.hlData) : null;
 
-                        const domElements = await createLayerDOM(domSrc, layerData.nWidth, layerData.nHeight, layerData.fogRatio, domFog, isVid, ytId);
+                        const domElements = await createLayerDOM(domSrc, layerData.nWidth, layerData.nHeight, layerData.fogRatio, domFog, domHl, isVid, ytId);
                         
                         const createdLayer = {
                             id: layerData.id, name: layerData.name, fileName: layerData.fileName,
                             imgSrc: layerData.imgSrc, ytId: ytId, nWidth: layerData.nWidth, nHeight: layerData.nHeight, fogRatio: layerData.fogRatio,
-                            wrapper: domElements.wrapper, canvas: domElements.canvas, ctx: domElements.ctx, mediaEl: domElements.mediaEl, atmosphereEl: domElements.atmosphereEl, svg: domElements.svg,
+                            wrapper: domElements.wrapper, canvas: domElements.canvas, ctx: domElements.ctx, hlCanvas: domElements.hlCanvas, hlCtx: domElements.hlCtx, mediaEl: domElements.mediaEl, atmosphereEl: domElements.atmosphereEl,
                             x: layerData.x, y: layerData.y, scale: layerData.scale, rotation: layerData.rotation || 0, volume: layerData.volume || 0,
                             visible: layerData.visible, lockMove: layerData.lockMove || false, lockScale: layerData.lockScale || false,
-                            isVideo: isVid, needsRelink: needsRelink, drawings: layerData.drawings || [], filter: layerData.filter || 'none'
+                            isVideo: isVid, needsRelink: needsRelink, filter: layerData.filter || 'none'
                         };
                         newScene.layers.push(createdLayer);
-                        renderLayerDrawings(createdLayer);
                         applyLayerAtmosphere(createdLayer);
                         setTimeout(() => applyLayerVolume(createdLayer), 1500);
                     }
@@ -822,6 +804,7 @@ try {
         });
     }
 
+    // --- NUOVA GRAFICA LAYER (Spaziosa su 2 righe) ---
     function renderLayers() {
         const scene = scenes.find(s => s.id === currentSceneId);
         layerListEl.innerHTML = '';
@@ -851,13 +834,38 @@ try {
         }
 
         [...scene.layers].reverse().forEach(layer => {
-            const row = document.createElement('div'); row.className = `item-row ${layer.id === activeLayerId ? 'active' : ''}`;
+            const container = document.createElement('div'); 
+            container.className = `layer-item-container ${layer.id === activeLayerId ? 'active' : ''}`;
+            container.onclick = () => { activeLayerId = layer.id; if(currentMode === 'camera') updateToolUI('layer'); else renderLayers(); };
+
+            // Riga Superiore: Nome e Azioni Distruttive/Visibilità
+            const topRow = document.createElement('div'); topRow.className = 'layer-top-row';
+            const nameWrap = document.createElement('div'); nameWrap.className = 'layer-name-wrap';
+            nameWrap.innerText = layer.name + (layer.ytId ? " 🔴" : (layer.isVideo ? " 🎥" : ""));
             
-            const nameEl = document.createElement('div'); 
-            nameEl.className = 'item-name'; 
-            nameEl.innerText = layer.name + (layer.ytId ? " 🔴" : (layer.isVideo ? " 🎥" : "")); 
-            nameEl.onclick = () => { activeLayerId = layer.id; if(currentMode === 'camera') updateToolUI('layer'); else renderLayers(); };
+            const topBtns = document.createElement('div'); topBtns.style.display = 'flex'; topBtns.style.gap = '6px';
             
+            const btnVis = document.createElement('button'); btnVis.className = `mini-btn ${layer.visible ? '' : 'danger'}`; btnVis.innerText = layer.visible ? '👁️' : '❌'; 
+            btnVis.title = "Visibilità"; btnVis.onclick = (e) => { e.stopPropagation(); layer.visible = !layer.visible; updateLayerTransform(layer); renderLayers(); };
+            
+            const btnDel = document.createElement('button'); btnDel.className = 'mini-btn danger'; btnDel.innerText = '🗑️'; 
+            btnDel.onclick = (e) => { 
+                e.stopPropagation();
+                scene.layers = scene.layers.filter(l => l.id !== layer.id); 
+                if (activeLayerId === layer.id) activeLayerId = null; 
+                layer.wrapper.remove(); 
+                scene.layers.forEach(l => updateLayerTransform(l));
+                renderLayers(); 
+            };
+
+            topBtns.appendChild(btnVis);
+            topBtns.appendChild(btnDel);
+            topRow.appendChild(nameWrap);
+            topRow.appendChild(topBtns);
+
+            // Riga Inferiore: Strumenti di Manipolazione
+            const botRow = document.createElement('div'); botRow.className = 'layer-bottom-row';
+
             const btnUp = document.createElement('button'); btnUp.className = 'mini-btn'; btnUp.innerText = '🔼'; btnUp.title = "Sposta Su";
             btnUp.onclick = (e) => { 
                 e.stopPropagation(); 
@@ -882,41 +890,30 @@ try {
                 }
             };
 
-            const btnVis = document.createElement('button'); btnVis.className = `mini-btn ${layer.visible ? '' : 'danger'}`; btnVis.innerText = layer.visible ? '👁️' : '❌'; 
-            btnVis.title = "Visibilità"; btnVis.onclick = (e) => { e.stopPropagation(); layer.visible = !layer.visible; updateLayerTransform(layer); renderLayers(); };
-            
             const btnLockMove = document.createElement('button'); btnLockMove.className = `mini-btn ${layer.lockMove ? 'danger' : ''}`; btnLockMove.innerText = layer.lockMove ? '📍' : '✋'; 
             btnLockMove.title = "Blocca Movimento"; btnLockMove.onclick = (e) => { e.stopPropagation(); layer.lockMove = !layer.lockMove; renderLayers(); };
 
             const btnLockScale = document.createElement('button'); btnLockScale.className = `mini-btn ${layer.lockScale ? 'danger' : ''}`; btnLockScale.innerText = layer.lockScale ? '🔒' : '🔎'; 
             btnLockScale.title = "Blocca Zoom"; btnLockScale.onclick = (e) => { e.stopPropagation(); layer.lockScale = !layer.lockScale; renderLayers(); };
             
-            const btnRename = document.createElement('button'); btnRename.className = 'mini-btn'; btnRename.innerText = '✏️'; btnRename.onclick = (e) => { e.stopPropagation(); renameLayer(layer.id); };
-            const btnDel = document.createElement('button'); btnDel.className = 'mini-btn danger'; btnDel.innerText = '🗑️'; 
-            btnDel.onclick = (e) => { 
-                e.stopPropagation();
-                scene.layers = scene.layers.filter(l => l.id !== layer.id); 
-                if (activeLayerId === layer.id) activeLayerId = null; 
-                layer.wrapper.remove(); 
-                scene.layers.forEach(l => updateLayerTransform(l));
-                renderLayers(); 
-            };
+            const btnRename = document.createElement('button'); btnRename.className = 'mini-btn'; btnRename.innerText = '✏️'; btnRename.title = "Rinomina"; btnRename.onclick = (e) => { e.stopPropagation(); renameLayer(layer.id); };
+            
+            botRow.appendChild(btnUp);
+            botRow.appendChild(btnDown);
+            botRow.appendChild(btnLockMove);
+            botRow.appendChild(btnLockScale);
+            botRow.appendChild(btnRename);
 
-            row.appendChild(nameEl); 
-            row.appendChild(btnUp); 
-            row.appendChild(btnDown);
-            row.appendChild(btnVis); 
-            row.appendChild(btnLockMove); 
-            row.appendChild(btnLockScale); 
-            row.appendChild(btnRename); 
-            row.appendChild(btnDel);
+            container.appendChild(topRow);
+            container.appendChild(botRow);
             
             if (layer.needsRelink) {
                 const btnRelink = document.createElement('button'); btnRelink.className = 'btn-relink'; btnRelink.innerText = `🎥 Ricarica: ${layer.fileName}`;
                 btnRelink.onclick = (e) => { e.stopPropagation(); layerToRelink = layer; document.getElementById('upload-relink').click(); };
-                row.appendChild(btnRelink);
+                container.appendChild(btnRelink);
             }
-            layerListEl.appendChild(row);
+            
+            layerListEl.appendChild(container);
         });
     }
 
@@ -946,9 +943,6 @@ try {
         let newScale = Math.max(0.05, Math.min(scene.scale * factor, 15));
         applyWorldTransform(centerX - (worldX * newScale), centerY - (worldY * newScale), newScale);
     }
-
-    document.getElementById('btn-zoom-in').onclick = () => doGlobalZoom(1.2);
-    document.getElementById('btn-zoom-out').onclick = () => doGlobalZoom(0.8);
     
     viewport.addEventListener('wheel', (e) => { 
         e.preventDefault(); 
@@ -959,17 +953,21 @@ try {
         else doGlobalZoom(factor, e.clientX, e.clientY);
     }, {passive: false});
 
+    // NUOVI STRUMENTI AGGIORNATI
     const tools = { 
-        'camera': document.getElementById('tool-camera'), 'layer': document.getElementById('tool-layer'), 
-        'draw': document.getElementById('tool-draw'), 'erase': document.getElementById('tool-erase'),
-        'hl-red': document.getElementById('tool-hl-red'), 'hl-green': document.getElementById('tool-hl-green'), 'hl-yellow': document.getElementById('tool-hl-yellow')
+        'camera': document.getElementById('tool-camera'), 
+        'layer': document.getElementById('tool-layer'), 
+        'draw': document.getElementById('tool-draw'), 
+        'erase': document.getElementById('tool-erase'),
+        'hl-draw': document.getElementById('tool-hl-draw'), 
+        'hl-erase': document.getElementById('tool-hl-erase')
     };
     
     function updateToolUI(mode) {
         currentMode = mode;
         Object.values(tools).forEach(btn => { if(btn) btn.classList.remove('active'); });
         if(tools[mode]) tools[mode].classList.add('active');
-        if ((mode === 'layer' || mode === 'draw' || mode === 'erase') && !activeLayerId) {
+        if ((mode === 'layer' || mode === 'draw' || mode === 'erase' || mode === 'hl-draw' || mode === 'hl-erase') && !activeLayerId) {
             const scene = scenes.find(s => s.id === currentSceneId);
             if (scene && scene.layers.length > 0) { activeLayerId = scene.layers[scene.layers.length - 1].id; renderLayers(); }
         }
@@ -1007,17 +1005,8 @@ try {
         return { x: localX, y: localY };
     }
 
-    function performDraw() {
-        if (!isInteracting || (currentMode !== 'draw' && currentMode !== 'erase')) { pendingDraw = false; return; }
-        const scene = scenes.find(s => s.id === currentSceneId);
-        const layer = scene?.layers.find(l => l.id === activeLayerId);
-        if(layer) { layer.ctx.beginPath(); layer.ctx.moveTo(drawLastX, drawLastY); layer.ctx.lineTo(drawCurrX, drawCurrY); layer.ctx.stroke(); }
-        drawLastX = drawCurrX; drawLastY = drawCurrY;
-        pendingDraw = false;
-    }
-
     function handleStart(e) {
-        if(e.target.closest('.glass-panel') || e.target.closest('#reveal-ui')) return;
+        if(e.target.closest('.glass-panel') || e.target.closest('#reveal-ui') || e.target.closest('#toast-container')) return;
         
         const currentTime = new Date().getTime();
         if (currentTime - lastTapTime < 300 && (!e.touches || e.touches.length === 1)) {
@@ -1051,14 +1040,6 @@ try {
             if (!activeLayer.lockMove) {
                 startX = ((pos.x - scene.panX) / scene.scale) - activeLayer.x; startY = ((pos.y - scene.panY) / scene.scale) - activeLayer.y;
             }
-        } else if (currentMode.startsWith('hl-') && activeLayer) {
-            const rawPos = getLayerLocalCoordsRaw(pos.x, pos.y, scene, activeLayer);
-            const colorMap = { 'hl-red': '#ff3b30', 'hl-green': '#34c759', 'hl-yellow': '#ffcc00' };
-            const brushThickness = document.getElementById('brush-size').value / scene.scale / activeLayer.scale;
-            currentPath = { color: colorMap[currentMode], width: brushThickness, points: [rawPos] };
-            if (!activeLayer.drawings) activeLayer.drawings = [];
-            activeLayer.drawings.push(currentPath);
-            renderLayerDrawings(activeLayer);
         } else if ((currentMode === 'draw' || currentMode === 'erase') && activeLayer) {
             const rawPos = getLayerLocalCoordsRaw(pos.x, pos.y, scene, activeLayer);
             activeLayer.ctx.lineWidth = (document.getElementById('brush-size').value / scene.scale / activeLayer.scale) * activeLayer.fogRatio;
@@ -1069,6 +1050,25 @@ try {
             drawCurrY = rawPos.y * activeLayer.fogRatio;
             drawLastX = drawCurrX; drawLastY = drawCurrY;
             activeLayer.ctx.beginPath(); activeLayer.ctx.moveTo(drawCurrX, drawCurrY); activeLayer.ctx.lineTo(drawCurrX+0.1, drawCurrY+0.1); activeLayer.ctx.stroke();
+        } 
+        // NUOVA LOGICA: HIGHLIGHTER SU CANVAS
+        else if ((currentMode === 'hl-draw' || currentMode === 'hl-erase') && activeLayer) {
+            const rawPos = getLayerLocalCoordsRaw(pos.x, pos.y, scene, activeLayer);
+            activeLayer.hlCtx.lineWidth = (document.getElementById('brush-size').value / scene.scale / activeLayer.scale) * activeLayer.fogRatio;
+            activeLayer.hlCtx.lineCap = 'round'; activeLayer.hlCtx.lineJoin = 'round';
+            
+            if (currentMode === 'hl-draw') {
+                activeLayer.hlCtx.globalCompositeOperation = 'source-over';
+                activeLayer.hlCtx.strokeStyle = currentHlColor;
+            } else {
+                activeLayer.hlCtx.globalCompositeOperation = 'destination-out';
+                activeLayer.hlCtx.strokeStyle = 'rgba(0,0,0,1)';
+            }
+            
+            drawCurrX = rawPos.x * activeLayer.fogRatio; 
+            drawCurrY = rawPos.y * activeLayer.fogRatio;
+            drawLastX = drawCurrX; drawLastY = drawCurrY;
+            activeLayer.hlCtx.beginPath(); activeLayer.hlCtx.moveTo(drawCurrX, drawCurrY); activeLayer.hlCtx.lineTo(drawCurrX+0.1, drawCurrY+0.1); activeLayer.hlCtx.stroke();
         }
     }
 
@@ -1105,23 +1105,6 @@ try {
                 activeLayer.y = ((pos.y - scene.panY) / scene.scale) - startY; 
                 updateLayerTransform(activeLayer);
             }
-        } else if (currentMode.startsWith('hl-') && currentPath && activeLayer) {
-            const rawPos = getLayerLocalCoordsRaw(pos.x, pos.y, scene, activeLayer);
-            currentPath.points.push(rawPos);
-            
-            if (!pendingDraw) {
-                pendingDraw = true;
-                requestAnimationFrame(() => {
-                    if (currentPath && activeLayer && activeLayer.svg) {
-                        const polylines = activeLayer.svg.querySelectorAll('polyline');
-                        if (polylines.length > 0) {
-                            const lastPoly = polylines[polylines.length - 1];
-                            lastPoly.setAttribute("points", currentPath.points.map(p => `${p.x},${p.y}`).join(" "));
-                        }
-                    }
-                    pendingDraw = false;
-                });
-            }
         } else if ((currentMode === 'draw' || currentMode === 'erase') && activeLayer) {
             const rawPos = getLayerLocalCoordsRaw(pos.x, pos.y, scene, activeLayer);
             drawCurrX = rawPos.x * activeLayer.fogRatio; 
@@ -1130,6 +1113,19 @@ try {
                 pendingDraw = true;
                 requestAnimationFrame(() => {
                     activeLayer.ctx.beginPath(); activeLayer.ctx.moveTo(drawLastX, drawLastY); activeLayer.ctx.lineTo(drawCurrX, drawCurrY); activeLayer.ctx.stroke();
+                    drawLastX = drawCurrX; drawLastY = drawCurrY; pendingDraw = false;
+                });
+            }
+        }
+        // NUOVA LOGICA: MUOVI HIGHLIGHTER CANVAS
+        else if ((currentMode === 'hl-draw' || currentMode === 'hl-erase') && activeLayer) {
+            const rawPos = getLayerLocalCoordsRaw(pos.x, pos.y, scene, activeLayer);
+            drawCurrX = rawPos.x * activeLayer.fogRatio; 
+            drawCurrY = rawPos.y * activeLayer.fogRatio;
+            if (!pendingDraw) {
+                pendingDraw = true;
+                requestAnimationFrame(() => {
+                    activeLayer.hlCtx.beginPath(); activeLayer.hlCtx.moveTo(drawLastX, drawLastY); activeLayer.hlCtx.lineTo(drawCurrX, drawCurrY); activeLayer.hlCtx.stroke();
                     drawLastX = drawCurrX; drawLastY = drawCurrY; pendingDraw = false;
                 });
             }
@@ -1146,11 +1142,6 @@ try {
     viewport.addEventListener('touchstart', handleStart, {passive: false}); viewport.addEventListener('touchmove', handleMove, {passive: false});
     window.addEventListener('touchend', handleEnd); window.addEventListener('touchcancel', handleEnd);
     
-    viewport.addEventListener('dblclick', (e) => {
-        if(e.target.closest('.glass-panel') || e.target.closest('#reveal-ui')) return;
-        toggleCinemaMode();
-    });
-
     document.getElementById('btn-fullscreen').onclick = () => {
         if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(err => console.log(err));
         else if (document.exitFullscreen) document.exitFullscreen();
