@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>D&D Tavolo Proiettore - V40 Smart Panels</title>
+    <title>D&D Tavolo Proiettore - V41 Smart Hide</title>
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
     <style>
         /* --- RESET E BASE --- */
@@ -71,7 +71,7 @@
         .tool-btn:active { transform: scale(0.95); }
         .tool-btn.active { background: #0a84ff; box-shadow: 0 0 18px rgba(10, 132, 255, 0.6); outline: 2px solid rgba(255,255,255,0.5); }
 
-        /* BARRA CONTESTUALE (Fluttuante) */
+        /* BARRA CONTESTUALE */
         #sub-toolbar {
             position: absolute; top: 20px; left: 100px; 
             padding: 14px 16px; border-radius: 16px;
@@ -300,9 +300,8 @@
 
     <div class="row" style="margin-top: 4px;">
         <button id="btn-fullscreen" class="row-btn" style="background:rgba(90, 200, 250, 0.2); border: 1px solid #5ac8fa; color:#5ac8fa;"><span class="material-symbols-rounded">fullscreen</span> Intero</button>
-        <button id="hide-ui" class="row-btn" style="background:rgba(255,255,255,0.1);"><span class="material-symbols-rounded">visibility_off</span> Nascondi</button>
+        <button id="hide-ui" class="row-btn" style="background:rgba(255,255,255,0.1);"><span class="material-symbols-rounded">visibility_off</span> Nascondi Pannello</button>
     </div>
-    <div style="text-align: center; font-size: 11px; color: rgba(255,255,255,0.4); margin-top: 8px;">(Doppio tap sulla mappa per nascondere. Tieni premuto per il Ping!)</div>
 </div>
 
 <button id="reveal-ui" class="hidden"><span class="material-symbols-rounded">settings</span></button>
@@ -392,7 +391,7 @@ try {
     const btnLockCamera = document.getElementById('btn-lock-camera');
     const rotSlider = document.getElementById('layer-rotation');
     const volSlider = document.getElementById('layer-volume');
-    const volumeWrapper = document.getElementById('volume-wrapper'); // Nuovo elemento wrapper del volume
+    const volumeWrapper = document.getElementById('volume-wrapper');
     const calibSquare = document.getElementById('calibration-square');
     const rotDisplay = document.getElementById('rot-display');
     const volDisplay = document.getElementById('vol-display');
@@ -455,27 +454,6 @@ try {
         }
     }
 
-    function renderLayerDrawings(layer) {
-        if (!layer || !layer.svg) return;
-        while (layer.svg.firstChild) {
-            layer.svg.removeChild(layer.svg.firstChild);
-        }
-        if (!layer.drawings) return;
-        
-        layer.drawings.forEach(path => {
-            const polyline = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
-            polyline.setAttribute("fill", "none");
-            polyline.setAttribute("stroke", path.color);
-            polyline.setAttribute("stroke-width", path.width);
-            polyline.setAttribute("stroke-linecap", "round");
-            polyline.setAttribute("stroke-linejoin", "round");
-            polyline.setAttribute("opacity", "0.7");
-            const pointsStr = path.points.map(p => `${p.x},${p.y}`).join(" ");
-            polyline.setAttribute("points", pointsStr);
-            layer.svg.appendChild(polyline);
-        });
-    }
-
     function triggerPing(worldX, worldY) {
         const ping = document.createElement('div');
         ping.className = 'ping-marker';
@@ -512,7 +490,6 @@ try {
             updateLayerTransform(layer); 
             applyLayerVolume(layer);
             applyLayerAtmosphere(layer); 
-            renderLayerDrawings(layer);
 
             if (layer.isVideo && layer.mediaEl) {
                 layer.mediaEl.play().catch(err => console.log("Autoplay error:", err));
@@ -954,7 +931,6 @@ try {
                 rotSlider.value = activeL.rotation || 0; rotDisplay.innerText = (activeL.rotation || 0) + "°";
                 document.getElementById('atmosphere-select').value = activeL.filter || 'none';
                 
-                // LOGICA VOLUME INTELLIGENTE
                 if(activeL.isVideo || activeL.ytId) {
                     if(volumeWrapper) volumeWrapper.style.display = 'block';
                     volSlider.disabled = false; 
@@ -1121,7 +1097,6 @@ try {
         Object.values(tools).forEach(btn => { if(btn) btn.classList.remove('active'); });
         if(tools[mode]) tools[mode].classList.add('active');
         
-        // Reset sub-tools visibility
         subColors.style.display = 'none';
         subBrushSize.style.display = 'none';
         subCameraLock.style.display = 'none';
@@ -1309,25 +1284,40 @@ try {
     const rightPanel = document.getElementById('right-panel');
     const revealUiBtn = document.getElementById('reveal-ui');
 
+    // --- NUOVA LOGICA "NASCONDI" (Nasconde solo a destra) ---
     document.getElementById('hide-ui').onclick = () => { 
-        leftToolbar.classList.add('hidden'); rightPanel.classList.add('hidden'); subToolbar.classList.add('hidden'); revealUiBtn.classList.remove('hidden'); isCinemaMode = true; 
+        rightPanel.classList.add('hidden'); 
+        revealUiBtn.classList.remove('hidden'); 
     };
     
     revealUiBtn.onclick = () => { 
-        leftToolbar.classList.remove('hidden'); rightPanel.classList.remove('hidden'); updateToolUI(currentMode); revealUiBtn.classList.add('hidden'); isCinemaMode = false; 
+        leftToolbar.classList.remove('hidden'); 
+        rightPanel.classList.remove('hidden'); 
+        updateToolUI(currentMode); 
+        revealUiBtn.classList.add('hidden'); 
     };
 
+    // --- NUOVA LOGICA "CINEMA MODE" (Doppio tap per nascondere e mostrare tutto) ---
     function toggleCinemaMode() {
         isCinemaMode = !isCinemaMode;
-        if (isCinemaMode) { leftToolbar.classList.add('hidden'); rightPanel.classList.add('hidden'); subToolbar.classList.add('hidden'); revealUiBtn.classList.add('hidden'); } 
-        else { revealUiBtn.classList.remove('hidden'); }
+        if (isCinemaMode) { 
+            leftToolbar.classList.add('hidden'); 
+            rightPanel.classList.add('hidden'); 
+            subToolbar.classList.add('hidden'); 
+            revealUiBtn.classList.add('hidden'); 
+        } else { 
+            leftToolbar.classList.remove('hidden'); 
+            rightPanel.classList.remove('hidden'); 
+            updateToolUI(currentMode); 
+            revealUiBtn.classList.add('hidden'); 
+        }
     }
 
     document.getElementById('toggle-square').onclick = () => calibSquare.style.display = (calibSquare.style.display === 'none' || calibSquare.style.display === '') ? 'block' : 'none';
     document.getElementById('square-size').oninput = (e) => { calibSquare.style.width = e.target.value + 'px'; calibSquare.style.height = e.target.value + 'px'; };
 
     document.getElementById('btn-new-scene').onclick = createNewScene;
-    createNewScene(); // Inizializza subito l'UI chiamando updateToolUI('camera')
+    createNewScene();
 
 } catch (e) {
     showToast("ERRORE GRAVE: " + e.message, "error");
