@@ -3,32 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>D&D Tavolo Proiettore - V3.0</title>
+    <title>D&D Tavolo Proiettore - V4.0</title>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
     <style>
-        /* Regola globale per margini perfetti */
+        /* --- RESET E BASE --- */
         *, *::before, *::after { box-sizing: border-box; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #050505; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #eee; }
         
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #050505; font-family: sans-serif; touch-action: none; color: #eee; }
-        
-        #viewport { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
+        .material-symbols-rounded { vertical-align: middle; }
+
+        /* --- MOTORE GRAFICO --- */
+        #viewport { position: relative; width: 100vw; height: 100vh; overflow: hidden; touch-action: none; }
         #world-container { position: absolute; top: 0; left: 0; transform-origin: 0 0; will-change: transform; width: 0; height: 0; }
-        
-        /* Overflow hidden taglia disegni, nebbia e meteo al bordo del layer */
         .layer-wrapper { position: absolute; top: 0; left: 0; transform-origin: center; will-change: transform; overflow: hidden; }
         
-        /* Gestione Z-index interna al wrapper per i vari strati */
         .layer-img { width: 100%; height: 100%; object-fit: fill; display: block; pointer-events: none; border: none; z-index: 1; }
         .layer-atmosphere { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 2; transition: background 1.5s, mix-blend-mode 1.5s; }
         .fog-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 3; }
-        .layer-drawings { position: absolute; top: 0; left: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; z-index: 4; }
+        .hl-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 4; opacity: 0.8; }
         
-        @keyframes ping-anim {
-            0% { transform: scale(0); opacity: 1; border-width: 10px; }
-            100% { transform: scale(4); opacity: 0; border-width: 1px; }
-        }
+        @keyframes ping-anim { 0% { transform: scale(0); opacity: 1; border-width: 10px; } 100% { transform: scale(4); opacity: 0; border-width: 1px; } }
         .ping-marker { position: absolute; width: 60px; height: 60px; background: radial-gradient(circle, rgba(255,50,50,0.6) 0%, transparent 70%); border: 3px solid red; border-radius: 50%; transform-origin: center; animation: ping-anim 1.5s ease-out; pointer-events: none; z-index: 9999; margin-left: -30px; margin-top: -30px; }
 
-        /* Filtri Atmosfera (Applicati al layer specifico) */
+        /* Filtri Meteo & Atmosfera */
         @keyframes pulse-fire { 0% { background: rgba(255, 60, 0, 0.25); } 100% { background: rgba(200, 20, 0, 0.4); } }
         @keyframes rain-fall { 0% { background-position: 0px 0px, 0px 0px; } 100% { background-position: 100px 1000px, 50px 700px; } }
         @keyframes snow-fall { 0% { background-position: 0px 0px, 0px 0px; } 100% { background-position: 100px 400px, -50px 600px; } }
@@ -38,169 +35,276 @@
         .filter-sepia { background: rgba(150, 100, 50, 0.35); mix-blend-mode: multiply; }
         .filter-swamp { background: rgba(30, 80, 20, 0.5); mix-blend-mode: multiply; }
         .filter-blood { background: rgba(120, 0, 0, 0.6); mix-blend-mode: multiply; }
-        
-        /* Pioggia Parallasse Realistica */
-        .filter-rain {
-            background-color: rgba(10, 20, 30, 0.15); /* Leggero imbrunire tempestoso */
-            background-image: 
-                /* Primo piano: Gocce grandi e sparse, sferzate dal vento */
-                url("data:image/svg+xml,%3Csvg width='300' height='300' xmlns='http://www.w3.org/2000/svg'%3E%3Cline x1='20' y1='20' x2='28' y2='60' stroke='rgba(220,230,255,0.3)' stroke-width='1.5' stroke-linecap='round'/%3E%3Cline x1='180' y1='100' x2='188' y2='140' stroke='rgba(220,230,255,0.2)' stroke-width='1.2' stroke-linecap='round'/%3E%3Cline x1='100' y1='220' x2='108' y2='260' stroke='rgba(220,230,255,0.25)' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E"),
-                /* Secondo piano: Gocce sottili, per dare profondità */
-                url("data:image/svg+xml,%3Csvg width='200' height='200' xmlns='http://www.w3.org/2000/svg'%3E%3Cline x1='50' y1='50' x2='54' y2='75' stroke='rgba(200,220,255,0.15)' stroke-width='1' stroke-linecap='round'/%3E%3Cline x1='150' y1='120' x2='154' y2='145' stroke='rgba(200,220,255,0.1)' stroke-width='0.8' stroke-linecap='round'/%3E%3C/svg%3E");
-            animation: rain-fall 0.5s linear infinite;
-        }
-        
-        .filter-snow {
-            background-color: rgba(200, 220, 240, 0.15);
-            background-image: url("data:image/svg+xml,%3Csvg width='50' height='50' viewBox='0 0 50 50' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='25' cy='25' r='2' fill='rgba(255,255,255,0.8)'/%3E%3C/svg%3E"),
-                              url("data:image/svg+xml,%3Csvg width='80' height='80' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='40' cy='40' r='3.5' fill='rgba(255,255,255,0.4)'/%3E%3C/svg%3E");
-            animation: snow-fall 4s linear infinite;
-        }
+        .filter-rain { background-color: rgba(10, 20, 30, 0.15); background-image: url("data:image/svg+xml,%3Csvg width='300' height='300' xmlns='http://www.w3.org/2000/svg'%3E%3Cline x1='20' y1='20' x2='28' y2='60' stroke='rgba(220,230,255,0.3)' stroke-width='1.5' stroke-linecap='round'/%3E%3Cline x1='180' y1='100' x2='188' y2='140' stroke='rgba(220,230,255,0.2)' stroke-width='1.2' stroke-linecap='round'/%3E%3Cline x1='100' y1='220' x2='108' y2='260' stroke='rgba(220,230,255,0.25)' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E"), url("data:image/svg+xml,%3Csvg width='200' height='200' xmlns='http://www.w3.org/2000/svg'%3E%3Cline x1='50' y1='50' x2='54' y2='75' stroke='rgba(200,220,255,0.15)' stroke-width='1' stroke-linecap='round'/%3E%3Cline x1='150' y1='120' x2='154' y2='145' stroke='rgba(200,220,255,0.1)' stroke-width='0.8' stroke-linecap='round'/%3E%3C/svg%3E"); animation: rain-fall 0.5s linear infinite; }
+        .filter-snow { background-color: rgba(200, 220, 240, 0.15); background-image: url("data:image/svg+xml,%3Csvg width='50' height='50' viewBox='0 0 50 50' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='25' cy='25' r='2' fill='rgba(255,255,255,0.8)'/%3E%3C/svg%3E"), url("data:image/svg+xml,%3Csvg width='80' height='80' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='40' cy='40' r='3.5' fill='rgba(255,255,255,0.4)'/%3E%3C/svg%3E"); animation: snow-fall 4s linear infinite; }
 
         #calibration-square { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); border: 4px solid #ff3333; background: rgba(255, 51, 51, 0.3); z-index: 1000; pointer-events: none; width: 50px; height: 50px; display: none; }
+
+        /* --- UI GLASSMORPHISM --- */
+        .glass-panel {
+            background: rgba(20, 24, 28, 0.85); 
+            backdrop-filter: blur(8px); 
+            -webkit-backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+            z-index: 950;
+            transition: opacity 0.3s ease, transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        /* TOOLBAR SINISTRA */
+        #left-toolbar {
+            position: absolute; top: 20px; left: 20px;
+            width: 68px; padding: 10px 0; border-radius: 20px;
+            display: flex; flex-direction: column; align-items: center; gap: 12px;
+            touch-action: pan-y;
+        }
+        .toolbar-divider { width: 44px; height: 1px; background: rgba(255,255,255,0.15); margin: 2px 0; flex-shrink: 0; }
         
-        /* UI Panel e Accordion */
-        #ui-panel { position: absolute; top: 10px; left: 10px; z-index: 950; background: rgba(20,20,20,0.95); padding: 12px; border-radius: 8px; border: 1px solid #444; width: 330px; max-height: 90vh; overflow-y: auto; box-shadow: 0 5px 15px rgba(0,0,0,0.9); transition: opacity 0.2s; }
+        .tool-btn { 
+            width: 48px; height: 48px; border-radius: 14px; border: none; cursor: pointer; 
+            background: rgba(255,255,255,0.06); color: white; flex-shrink: 0; 
+            display: flex; align-items: center; justify-content: center; 
+            transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); outline: 2px solid transparent; 
+        }
+        .tool-btn .material-symbols-rounded { font-size: 26px; }
+        .tool-btn:hover { background: rgba(255,255,255,0.15); transform: scale(1.05); }
+        .tool-btn:active { transform: scale(0.95); }
+        .tool-btn.active { background: #0a84ff; box-shadow: 0 0 18px rgba(10, 132, 255, 0.6); outline: 2px solid rgba(255,255,255,0.5); }
+
+        /* BARRA CONTESTUALE */
+        #sub-toolbar {
+            position: absolute; top: 20px; left: 100px; 
+            padding: 14px 16px; border-radius: 16px;
+            display: flex; flex-direction: column; gap: 12px; align-items: center;
+            transform-origin: left center;
+        }
+        #sub-toolbar.hidden { transform: scale(0.9) translateX(-10px); }
+
+        .color-swatch { width: 30px; height: 30px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; transition: 0.2s; flex-shrink: 0; }
+        .color-swatch:hover { transform: scale(1.1); }
+        .color-swatch.active { border-color: white; transform: scale(1.2); box-shadow: 0 0 12px currentColor; }
+
+        input[type="range"] { width: 100%; margin: 0; accent-color: #0a84ff; height: 6px; border-radius: 5px; outline: none; }
+
+        /* PANNELLO DESTRA */
+        #right-panel {
+            position: absolute; top: 20px; right: 20px;
+            width: 340px; border-radius: 20px; padding: 16px;
+            display: flex; flex-direction: column; gap: 10px;
+            max-height: calc(100vh - 40px); 
+            overflow-y: auto; touch-action: pan-y; overscroll-behavior: contain; 
+            scrollbar-width: none; -ms-overflow-style: none;
+        }
+        #right-panel::-webkit-scrollbar { display: none; }
+
+        /* ACCORDIONS */
+        .acc-group { display: flex; flex-direction: column; width: 100%; border-radius: 12px; overflow: hidden; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); flex-shrink: 0;}
+        .acc-btn { 
+            width: 100%; text-align: left; background: transparent; color: #fff; 
+            padding: 14px; font-size: 13px; text-transform: uppercase; font-weight: 700; 
+            border: none; cursor: pointer; transition: all 0.3s ease; letter-spacing: 0.5px;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .acc-btn:hover { background: rgba(255,255,255,0.05); }
+        .acc-btn.active { background: rgba(10, 132, 255, 0.15); border-bottom: 1px solid rgba(10, 132, 255, 0.3); }
+        .acc-content { display: none; padding: 14px; }
+
+        .row { display: flex; gap: 8px; align-items: center; flex-shrink: 0;}
+        .row-btn { flex: 1; padding: 12px; border-radius: 10px; border: none; background: rgba(255,255,255,0.1); color: white; font-weight: 600; font-size: 13px; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; gap: 6px; }
+        .row-btn:hover { background: rgba(255,255,255,0.2); }
+        .btn-primary { background: #0a84ff; } .btn-primary:hover { background: #007aff; }
+        .btn-warning { background: #ff9f0a; color: black; } .btn-warning:hover { background: #ff8c00; }
+        .btn-danger { background: #ff453a; } .btn-danger:hover { background: #ff3b30; }
+
+        label { font-size: 11px; color: #bbb; display: block; margin: 10px 0 6px 0; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;}
+        select { width: 100%; background: rgba(0,0,0,0.4); color: white; border: 1px solid rgba(255,255,255,0.2); padding: 10px; border-radius: 10px; font-size: 14px; outline: none; }
+        select option { background: #222; }
+
+        /* CARDS (Scene e Layer) */
+        .list-container { 
+            display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; 
+            max-height: 35vh; overflow-y: auto; overscroll-behavior: contain;
+            scrollbar-width: none; -ms-overflow-style: none;
+        }
+        .list-container::-webkit-scrollbar { display: none; }
+
+        .scene-item, .layer-item-container { display: flex; flex-direction: column; background: rgba(0,0,0,0.4); padding: 10px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05); gap: 10px; transition: 0.2s; cursor: pointer; flex-shrink: 0; }
+        .scene-item.active, .layer-item-container.active { border-color: rgba(10, 132, 255, 0.6); background: rgba(10, 132, 255, 0.15); box-shadow: 0 0 15px rgba(10, 132, 255, 0.1); }
         
-        .acc-btn { width: 100%; text-align: left; background: #2b2b2b; color: #fff; padding: 10px; font-size: 13px; text-transform: uppercase; font-weight: bold; border: 1px solid #444; border-radius: 4px; margin-bottom: 5px; cursor: pointer; transition: 0.2s; }
-        .acc-btn:hover { background: #3b3b3b; }
-        .acc-btn.active { background: #0056b3; border-color: #007bff; border-bottom-left-radius: 0; border-bottom-right-radius: 0; margin-bottom: 0; }
-        .acc-content { display: none; background: #1a1a1a; border: 1px solid #444; border-top: none; padding: 10px; border-bottom-left-radius: 4px; border-bottom-right-radius: 4px; margin-bottom: 5px; }
+        .layer-top-row { display: flex; justify-content: space-between; align-items: center; width: 100%; }
+        .layer-name-wrap { flex: 1; font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 10px; display: flex; align-items: center; gap: 6px; }
+        .layer-bottom-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; width: 100%; }
+
+        .mini-btn { width: 100%; height: 34px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.4); color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
+        .mini-btn .material-symbols-rounded { font-size: 18px; }
+        .mini-btn:hover { background: rgba(255,255,255,0.2); transform: translateY(-1px); }
+        .mini-btn.danger { color: #ff453a; }
+        .mini-btn.danger:hover { background: rgba(255, 69, 58, 0.2); }
         
-        label { font-size: 11px; font-weight: bold; color: #aaa; display: block; margin: 8px 0 3px 0; text-transform: uppercase; }
-        input[type="file"], input[type="range"], select { width: 100%; margin-bottom: 8px; }
-        input[type="file"] { font-size: 12px; color: #ccc; }
-        select { background: #333; color: white; border: 1px solid #555; padding: 5px; border-radius: 4px; }
-        
-        button { padding: 6px; font-size: 12px; border-radius: 4px; border: none; cursor: pointer; font-weight: bold; background: #444; color: white; transition: 0.1s; width: 100%; }
-        button:active { transform: scale(0.95); }
-        
-        .row { display: flex; gap: 4px; margin-bottom: 8px; }
-        .row button { flex: 1; margin: 0; background: #333; border: 1px solid #222; display: flex; align-items: center; justify-content: center;}
-        .row button.active { background: #007bff; border-color: #66b0ff; box-shadow: inset 0 0 5px rgba(0,0,0,0.5); }
-        
-        /* Strumenti specifici */
-        .color-btn { width: 30px; height: 30px; border-radius: 50%; flex: none !important; border: 2px solid transparent !important; }
-        .color-btn.active { border-color: white !important; transform: scale(1.1); box-shadow: 0 0 8px currentColor; }
-        .bg-red { background-color: #ff3333 !important; color: #ff3333; }
-        .bg-green { background-color: #33ff33 !important; color: #33ff33; }
-        .bg-yellow { background-color: #ffff33 !important; color: #ffff33; }
-        
-        .list-container { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
-        .item-row { display: flex; align-items: center; flex-wrap: wrap; background: #222; padding: 4px; border-radius: 4px; border: 1px solid #333; gap: 2px;}
-        .item-row.active { border-color: #5cb85c; background: #1a2a1a; }
-        .item-name { flex: 1; min-width: 60px; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; padding: 4px; }
-        .btn-icon { width: 22px; height: 22px; padding: 0; background: #333; font-size: 11px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;}
-        .btn-icon:hover { background: #555; }
-        .btn-icon.on { background: #f0ad4e; color: black; }
-        .btn-icon.danger { background: #d9534f; color: white; }
-        .btn-relink { width: 100%; background: #e67e22; color: #000; margin-top: 4px; padding: 4px; font-size: 11px;}
-        
-        #btn-fullscreen { background-color: #17a2b8; padding: 10px; font-size: 14px; margin-top: 5px; }
-        #hide-ui { background-color: #5cb85c; padding: 10px; font-size: 14px; margin-top: 5px; }
         .hidden { display: none !important; opacity: 0; pointer-events: none; }
-        #reveal-ui { position: absolute; top: 10px; right: 10px; z-index: 1000; background: rgba(0,0,0,0.6); color: white; border-radius: 50%; width: 50px; height: 50px; font-size: 24px; border: 2px solid rgba(255,255,255,0.4); cursor: pointer; transition: opacity 0.2s; }
-        #loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2000; display: flex; justify-content: center; align-items: center; flex-direction: column; color: white; font-size: 20px; display: none; }
-        .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #5cb85c; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 15px; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        #reveal-ui { position: absolute; top: 20px; right: 20px; z-index: 1000; background: rgba(25,30,35,0.8); backdrop-filter: blur(10px); color: white; border-radius: 50%; width: 60px; height: 60px; border: 1px solid rgba(255,255,255,0.2); cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 20px rgba(0,0,0,0.6);}
+
+        /* NUOVA MODAL CUSTOM */
+        #custom-modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 10000; display: none; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
+        #custom-modal { display: flex; flex-direction: column; gap: 16px; width: 340px; padding: 24px; text-align: center; }
+        #modal-text { font-size: 16px; font-weight: 600; color: white; }
+        #modal-input { width: 100%; padding: 12px; border-radius: 10px; background: rgba(0,0,0,0.6); color: white; border: 1px solid rgba(255,255,255,0.2); font-size: 15px; outline: none; }
+        #modal-input:focus { border-color: #0a84ff; }
+
+        /* TOAST NOTIFICATIONS */
+        #toast-container { position: fixed; top: 30px; left: 50%; transform: translateX(-50%); z-index: 9999; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
+        .toast { background: rgba(20, 20, 20, 0.95); backdrop-filter: blur(10px); border-radius: 30px; padding: 14px 28px; color: white; font-size: 15px; font-weight: 600; box-shadow: 0 10px 30px rgba(0,0,0,0.6); opacity: 0; transform: translateY(-20px); transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55); border: 1px solid rgba(255,255,255,0.1); }
+        .toast.show { opacity: 1; transform: translateY(0); }
+        .toast.error { border-color: #ff453a; color: #ff5e55; }
+        .toast.success { border-color: #32d74b; color: #4cd964; }
+
+        #loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(5px); z-index: 2000; display: flex; justify-content: center; align-items: center; flex-direction: column; color: white; font-size: 18px; font-weight: bold; letter-spacing: 1px; display: none; }
+        .spinner { border: 4px solid rgba(255,255,255,0.1); border-top: 4px solid #0a84ff; border-radius: 50%; width: 60px; height: 60px; animation: spin 1s linear infinite; margin-bottom: 20px; }
+
+        /* ADATTAMENTO MOBILE */
+        @media (max-width: 768px) {
+            #left-toolbar { top: auto; bottom: 15px; left: 50%; transform: translateX(-50%); width: calc(100vw - 30px); flex-direction: row; overflow-x: auto; justify-content: flex-start; padding: 10px 14px; touch-action: pan-x; border-radius: 24px; scrollbar-width: none; -ms-overflow-style: none; }
+            #left-toolbar::-webkit-scrollbar { display: none; }
+            .toolbar-divider { width: 1px; height: 36px; margin: 0 6px; }
+            
+            #sub-toolbar { top: auto; bottom: 90px; left: 50%; transform: translateX(-50%); width: max-content; transform-origin: bottom center; }
+            #sub-toolbar.hidden { transform: scale(0.9) translateX(-50%) translateY(10px); }
+            
+            #right-panel { top: 15px; right: auto; left: 50%; transform: translateX(-50%); width: calc(100vw - 30px); max-height: calc(100vh - 100px); padding-bottom: 24px; }
+            #reveal-ui { top: 15px; right: 15px; }
+        }
     </style>
 </head>
 <body>
 
-<div id="loading-overlay"><div class="spinner"></div><div id="loading-text">Caricamento...</div></div>
+<div id="loading-overlay"><div class="spinner"></div><div id="loading-text">Caricamento in corso...</div></div>
+<div id="toast-container"></div>
+<div id="atmosphere-overlay"></div>
 
-<div id="ui-panel">
-    <div class="row" style="margin-bottom: 12px;">
-        <button id="btn-save-project" style="background: #e0a800; color: #000;">💾 Salva</button>
-        <button id="btn-load-trigger" style="background: #138496;">📂 Carica</button>
+<div id="custom-modal-overlay">
+    <div id="custom-modal" class="glass-panel">
+        <div id="modal-text">Messaggio</div>
+        <input type="text" id="modal-input" autocomplete="off">
+        <div class="row" style="margin-top: 8px;">
+            <button id="modal-cancel" class="row-btn" style="background: rgba(255,255,255,0.1);">Annulla</button>
+            <button id="modal-ok" class="row-btn btn-primary">Conferma</button>
+        </div>
+    </div>
+</div>
+
+<div id="left-toolbar" class="glass-panel">
+    <button id="tool-camera" class="tool-btn active" title="Sposta Camera"><span class="material-symbols-rounded">pan_tool</span></button>
+    <button id="tool-layer" class="tool-btn" title="Sposta Livello"><span class="material-symbols-rounded">layers</span></button>
+    
+    <div class="toolbar-divider"></div>
+    
+    <button id="tool-draw" class="tool-btn" title="Aggiungi Nebbia"><span class="material-symbols-rounded">cloud</span></button>
+    <button id="tool-erase" class="tool-btn" title="Cancella Nebbia"><span class="material-symbols-rounded">ink_eraser</span></button>
+    
+    <div class="toolbar-divider"></div>
+    
+    <button id="tool-hl-draw" class="tool-btn" title="Evidenzia"><span class="material-symbols-rounded">brush</span></button>
+    <button id="tool-hl-erase" class="tool-btn" title="Gomma Evidenziatore"><span class="material-symbols-rounded">cleaning_services</span></button>
+</div>
+
+<div id="sub-toolbar" class="glass-panel hidden">
+    
+    <div id="sub-camera-lock" style="width: 100%; display: none;">
+        <button id="btn-lock-camera" class="row-btn" style="width: 100%;">
+            <span class="material-symbols-rounded">lock_open</span> Blocca Mappa
+        </button>
+    </div>
+
+    <div id="sub-colors" class="row" style="gap: 8px; justify-content: center; margin-bottom: 12px; display: none;">
+        <button class="color-swatch active" data-color="#ff3b30" style="background:#ff3b30;"></button>
+        <button class="color-swatch" data-color="#34c759" style="background:#34c759;"></button>
+        <button class="color-swatch" data-color="#ffcc00" style="background:#ffcc00;"></button>
+        <button class="color-swatch" data-color="#5ac8fa" style="background:#5ac8fa;"></button>
+        <button class="color-swatch" data-color="#ff2d55" style="background:#ff2d55;"></button>
+        <button class="color-swatch" data-color="#ffffff" style="background:#ffffff;"></button>
+    </div>
+    
+    <div id="sub-brush-size" class="row" style="gap: 12px; width: 100%; display: none;">
+        <span class="material-symbols-rounded" style="font-size: 20px; color: #8e8e93;">line_weight</span>
+        <input type="range" id="brush-size" min="10" max="300" value="80" style="width: 140px;">
+    </div>
+</div>
+
+<div id="right-panel" class="glass-panel">
+    
+    <div class="row" style="margin-bottom: 4px;">
+        <button id="btn-save-project" class="row-btn btn-warning"><span class="material-symbols-rounded">save</span> Salva</button>
+        <button id="btn-load-trigger" class="row-btn btn-primary"><span class="material-symbols-rounded">folder_open</span> Carica</button>
         <input type="file" id="upload-project" accept=".json" class="hidden">
     </div>
 
-    <div class="acc-btn active">🎬 Mappe e Livelli</div>
-    <div class="acc-content" style="display: block;">
-        <div class="list-container" id="scene-list"></div>
-        <button id="btn-new-scene" style="background: #0056b3; margin-bottom:10px;">+ Nuova Scena</button>
-        
-        <label>Aggiungi alla Scena:</label>
-        <div class="row">
-            <button id="btn-upload-trigger" style="background: #555;">📁 Img / Video</button>
-            <button id="btn-yt-layer" style="background: #cc0000;">🔴 YouTube</button>
-            <input type="file" id="upload-layer" accept="image/*,video/*" class="hidden">
-        </div>
-        <div class="list-container" id="layer-list" style="margin-top: 8px;"></div>
-    </div>
-
-    <div class="acc-btn">⚙️ Strumenti Master</div>
-    <div class="acc-content">
-        <label>Navigazione:</label>
-        <div class="row">
-            <button id="tool-camera" class="active">🌍 Camera</button>
-            <button id="tool-layer">✋ Sposta Layer</button>
-        </div>
-        <button id="btn-lock-camera" style="margin-bottom: 8px; background: #333;">🔓 Camera Sbloccata</button>
-        <div class="row">
-            <button id="btn-zoom-out">🔍 -</button>
-            <button id="btn-zoom-in">🔍 +</button>
-        </div>
-
-        <label>Nebbia di Guerra:</label>
-        <div class="row">
-            <button id="tool-draw">⬛ + Nebbia</button>
-            <button id="tool-erase">🧽 - Nebbia</button>
-        </div>
-        <div class="row">
-            <button id="clear-fog" style="background:#d9534f;">Pulisci</button>
-            <button id="fill-fog" style="background:#555;">Copri</button>
-        </div>
-
-        <label>Evidenziatore (Sul Layer):</label>
-        <div class="row" style="justify-content: space-between;">
-            <button id="tool-hl-red" class="color-btn bg-red" title="Rosso"></button>
-            <button id="tool-hl-green" class="color-btn bg-green" title="Verde"></button>
-            <button id="tool-hl-yellow" class="color-btn bg-yellow" title="Giallo"></button>
-            <button id="clear-drawings" style="flex: 1; background: #d9534f; margin-left: 10px;">🗑️ Disegni</button>
-        </div>
-
-        <label>Spessore Nebbia / Evidenziatore:</label>
-        <input type="range" id="brush-size" min="10" max="300" value="80">
-
-        <label>Proprietà Layer Attivo:</label>
-        <div class="row" style="align-items: center; margin-bottom: 4px;">
-            <span style="font-size:10px; width:65px;">Rot: <span id="rot-display" style="color:#f0ad4e;">0</span>°</span>
-            <input type="range" id="layer-rotation" min="0" max="360" value="0" style="margin-bottom: 0;">
-            <button id="btn-reset-rot" style="flex: 0 0 auto; width: 35px; margin-left: 5px; padding: 2px;">0°</button>
-        </div>
-        <div class="row" style="align-items: center; margin-bottom: 8px;">
-            <span style="font-size:10px; width:65px;">Vol: <span id="vol-display" style="color:#5cb85c;">0</span>%</span>
-            <input type="range" id="layer-volume" min="0" max="100" value="0" style="margin-bottom: 0;" disabled>
+    <div class="acc-group">
+        <button class="acc-btn active"><span class="material-symbols-rounded">movie</span> Gestione Scene</button>
+        <div class="acc-content" style="display: block;">
+            <div class="list-container" id="scene-list"></div>
+            <button id="btn-new-scene" class="row-btn btn-primary" style="width: 100%; margin-top: 4px;"><span class="material-symbols-rounded">add</span> Nuova Scena</button>
         </div>
     </div>
 
-    <div class="acc-btn">🌗 Atmosfera e Calibrazione</div>
-    <div class="acc-content">
-        <label>Filtro Meteo (Sul Layer Attivo):</label>
-        <select id="atmosphere-select">
-            <option value="none">☀️ Nessuno (Giorno)</option>
-            <option value="night">🌙 Notte Oscura</option>
-            <option value="fire">🔥 Incendio / Pericolo</option>
-            <option value="rain">🌧️ Pioggia Battente</option>
-            <option value="snow">❄️ Bufera di Neve</option>
-            <option value="swamp">☠️ Palude Tossica</option>
-            <option value="blood">🩸 Furia Sanguinaria</option>
-            <option value="sepia">📜 Antico / Locanda</option>
-        </select>
-
-        <label style="margin-top: 15px;">Calibrazione Proiettore:</label>
-        <button id="toggle-square" style="background: #d9831f; margin-bottom:5px;">Mostra Quadrato Rosso</button>
-        <input type="range" id="square-size" min="1" max="1000" value="50">
+    <div class="acc-group">
+        <button class="acc-btn"><span class="material-symbols-rounded">layers</span> Livelli della Scena</button>
+        <div class="acc-content">
+            <label>Aggiungi Nuovo Livello:</label>
+            <div class="row" style="margin-bottom: 12px;">
+                <button id="btn-upload-trigger" class="row-btn" style="background: rgba(255,255,255,0.15);"><span class="material-symbols-rounded">image</span> File Media</button>
+                <button id="btn-yt-layer" class="row-btn" style="background: rgba(255,59,48,0.8);"><span class="material-symbols-rounded">smart_display</span> YouTube</button>
+                <input type="file" id="upload-layer" accept="image/*,video/*" class="hidden">
+            </div>
+            <div class="list-container" id="layer-list"></div>
+        </div>
     </div>
 
-    <button id="btn-fullscreen">🔲 Schermo Intero</button>
-    <button id="hide-ui">Nascondi Menù</button>
-    <div style="text-align: center; margin-top: 5px; font-size: 10px; color: #888;">(Doppio Tap per nascondere. Tieni premuto sulla mappa per il Ping!)</div>
+    <div class="acc-group">
+        <button class="acc-btn"><span class="material-symbols-rounded">tune</span> Regolazioni Livello</button>
+        <div class="acc-content">
+            
+            <label>Filtro Meteo:</label>
+            <select id="atmosphere-select" style="margin-bottom: 20px;">
+                <option value="none">Sereno (Nessun filtro)</option>
+                <option value="night">Notte Oscura</option>
+                <option value="fire">Incendio / Pericolo</option>
+                <option value="rain">Pioggia Animata</option>
+                <option value="snow">Neve Animata</option>
+                <option value="swamp">Palude Tossica</option>
+                <option value="blood">Furia Sanguinaria</option>
+                <option value="sepia">Pergamena Antica</option>
+            </select>
+
+            <label style="display:flex; justify-content:space-between;">Rotazione: <span id="rot-display" style="color:#ffcc00;">0°</span></label>
+            <div class="row">
+                <input type="range" id="layer-rotation" min="0" max="360" value="0" style="flex:1; margin:0;">
+                <button id="btn-reset-rot" class="row-btn" style="flex:none; width:48px; padding:6px;">0°</button>
+            </div>
+
+            <div id="volume-wrapper" style="display: none; margin-top: 20px;">
+                <label style="display:flex; justify-content:space-between;">Volume Video: <span id="vol-display" style="color:#34c759;">0%</span></label>
+                <input type="range" id="layer-volume" min="0" max="100" value="0">
+            </div>
+            
+        </div>
+    </div>
+
+    <div class="acc-group">
+        <button class="acc-btn"><span class="material-symbols-rounded">crop_free</span> Calibrazione Proiettore</button>
+        <div class="acc-content">
+            <button id="toggle-square" class="row-btn" style="width: 100%; margin-bottom:10px; border: 1px solid #ff9f00; background: rgba(255,159,0,0.15);"><span class="material-symbols-rounded">crop_free</span> Mostra Mirino Rosso</button>
+            <input type="range" id="square-size" min="1" max="1000" value="50">
+        </div>
+    </div>
+
+    <div class="row" style="margin-top: 4px;">
+        <button id="btn-fullscreen" class="row-btn" style="background:rgba(90, 200, 250, 0.2); border: 1px solid #5ac8fa; color:#5ac8fa;"><span class="material-symbols-rounded">fullscreen</span> Intero</button>
+        <button id="hide-ui" class="row-btn" style="background:rgba(255,255,255,0.1);"><span class="material-symbols-rounded">visibility_off</span> Nascondi Pannello</button>
+    </div>
 </div>
 
-<button id="reveal-ui" class="hidden">⚙️</button>
+<button id="reveal-ui" class="hidden"><span class="material-symbols-rounded">settings</span></button>
 <input type="file" id="upload-relink" accept="video/*" class="hidden">
 
 <div id="viewport">
@@ -209,22 +313,67 @@
 </div>
 
 <script>
-window.onerror = function(msg, url, lineNo, columnNo, error) {
-    alert("ERRORE SUL TABLET:\n" + msg + "\nRiga: " + lineNo);
+// --- LOGICA MODAL CUSTOM ---
+const customModalOverlay = document.getElementById('custom-modal-overlay');
+const modalText = document.getElementById('modal-text');
+const modalInput = document.getElementById('modal-input');
+const modalOk = document.getElementById('modal-ok');
+const modalCancel = document.getElementById('modal-cancel');
+
+function showCustomModal(text, isPrompt = false, defaultValue = "", callback = null) {
+    modalText.innerText = text;
+    if(isPrompt) {
+        modalInput.style.display = 'block';
+        modalInput.value = defaultValue;
+        setTimeout(() => modalInput.focus(), 100);
+    } else {
+        modalInput.style.display = 'none';
+    }
+    customModalOverlay.style.display = 'flex';
+    
+    modalOk.onclick = null; modalCancel.onclick = null;
+    modalOk.onclick = () => { customModalOverlay.style.display = 'none'; if(callback) callback(isPrompt ? modalInput.value : true); };
+    modalCancel.onclick = () => { customModalOverlay.style.display = 'none'; if(callback) callback(isPrompt ? null : false); };
+}
+
+modalInput.addEventListener("keyup", function(event) { if (event.key === "Enter") { event.preventDefault(); modalOk.click(); } });
+
+// --- LOGICA ACCORDION ---
+document.querySelectorAll('.acc-btn').forEach(btn => {
+    btn.onclick = () => {
+        const content = btn.nextElementSibling;
+        const isActive = btn.classList.contains('active');
+        
+        document.querySelectorAll('.acc-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.acc-content').forEach(c => c.style.display = 'none');
+        
+        if (!isActive) {
+            btn.classList.add('active');
+            content.style.display = 'block';
+        }
+    };
+});
+
+// --- SISTEMA NOTIFICHE TOAST ---
+function showToast(msg, type = 'info') {
+    const container = document.getElementById('toast-container');
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.innerText = msg;
+    container.appendChild(toast);
+    requestAnimationFrame(() => toast.classList.add('show'));
+    setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 400); 
+    }, 3000);
+}
+
+window.onerror = function(msg, url, lineNo) {
+    showToast("ERRORE: " + msg + " (Riga " + lineNo + ")", "error");
     return false;
 };
 
 try {
-    // --- ACCORDION LOGIC ---
-    document.querySelectorAll('.acc-btn').forEach(btn => {
-        btn.onclick = () => {
-            document.querySelectorAll('.acc-btn').forEach(b => { b.classList.remove('active'); b.nextElementSibling.style.display = 'none'; });
-            btn.classList.add('active');
-            btn.nextElementSibling.style.display = 'block';
-        };
-    });
-
-    // --- VARIABILI GLOBALI ---
     let scenes = [];
     let currentSceneId = null;
     let activeLayerId = null; 
@@ -232,6 +381,7 @@ try {
     let layerCounter = 0;
     const MAX_FOG_RES = 1500;
     let layerToRelink = null;
+    let currentHlColor = '#ff3b30';
 
     const viewport = document.getElementById('viewport');
     const worldContainer = document.getElementById('world-container');
@@ -241,10 +391,14 @@ try {
     const btnLockCamera = document.getElementById('btn-lock-camera');
     const rotSlider = document.getElementById('layer-rotation');
     const volSlider = document.getElementById('layer-volume');
+    const volumeWrapper = document.getElementById('volume-wrapper');
     const calibSquare = document.getElementById('calibration-square');
-    
     const rotDisplay = document.getElementById('rot-display');
     const volDisplay = document.getElementById('vol-display');
+    const subToolbar = document.getElementById('sub-toolbar');
+    const subColors = document.getElementById('sub-colors');
+    const subBrushSize = document.getElementById('sub-brush-size');
+    const subCameraLock = document.getElementById('sub-camera-lock');
 
     let currentMode = 'camera'; 
     let isInteracting = false;
@@ -255,7 +409,6 @@ try {
     let lastTapTime = 0;
     let isCinemaMode = false;
     let pingTimer = null;
-    let currentPath = null;
 
     function safeBase64ToBlobUrl(b64) {
         if(!b64 || !b64.startsWith('data:')) return b64;
@@ -301,27 +454,6 @@ try {
         }
     }
 
-    function renderLayerDrawings(layer) {
-        if (!layer || !layer.svg) return;
-        while (layer.svg.firstChild) {
-            layer.svg.removeChild(layer.svg.firstChild);
-        }
-        if (!layer.drawings) return;
-        
-        layer.drawings.forEach(path => {
-            const polyline = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
-            polyline.setAttribute("fill", "none");
-            polyline.setAttribute("stroke", path.color);
-            polyline.setAttribute("stroke-width", path.width);
-            polyline.setAttribute("stroke-linecap", "round");
-            polyline.setAttribute("stroke-linejoin", "round");
-            polyline.setAttribute("opacity", "0.7");
-            const pointsStr = path.points.map(p => `${p.x},${p.y}`).join(" ");
-            polyline.setAttribute("points", pointsStr);
-            layer.svg.appendChild(polyline);
-        });
-    }
-
     function triggerPing(worldX, worldY) {
         const ping = document.createElement('div');
         ping.className = 'ping-marker';
@@ -340,6 +472,7 @@ try {
         scenes.push(newScene);
         switchScene(newScene.id);
         renderSceneList();
+        showToast(`Creata ${newScene.name}`, "success");
     }
 
     function switchScene(id) {
@@ -357,9 +490,7 @@ try {
             updateLayerTransform(layer); 
             applyLayerVolume(layer);
             applyLayerAtmosphere(layer); 
-            renderLayerDrawings(layer);
 
-            // FIX: Riattiva forzatamente i video locali quando si torna sulla scena
             if (layer.isVideo && layer.mediaEl) {
                 layer.mediaEl.play().catch(err => console.log("Autoplay error:", err));
             }
@@ -372,30 +503,40 @@ try {
 
     function renameScene(id) {
         const scene = scenes.find(s => s.id === id);
-        const newName = prompt("Inserisci il nuovo nome della scena:", scene.name);
-        if (newName) { scene.name = newName; renderSceneList(); }
+        showCustomModal("Inserisci il nuovo nome della scena:", true, scene.name, (newName) => {
+            if (newName && newName.trim() !== "") {
+                scene.name = newName;
+                renderSceneList();
+            }
+        });
     }
 
     function deleteScene(id) {
         const scene = scenes.find(s => s.id === id);
-        if (confirm(`Eliminare definitivamente la scena "${scene.name}"?`)) {
-            scene.layers.forEach(l => { if(l.mediaEl) l.mediaEl.src = ""; });
-            scenes = scenes.filter(s => s.id !== id);
-            if (scenes.length === 0) createNewScene();
-            else if (currentSceneId === id) switchScene(scenes[0].id);
-            else renderSceneList();
-        }
+        showCustomModal(`Eliminare definitivamente la scena "${scene.name}"?`, false, null, (confirmed) => {
+            if (confirmed) {
+                scene.layers.forEach(l => { if(l.mediaEl) l.mediaEl.src = ""; });
+                scenes = scenes.filter(s => s.id !== id);
+                if (scenes.length === 0) createNewScene();
+                else if (currentSceneId === id) switchScene(scenes[0].id);
+                else renderSceneList();
+                showToast("Scena eliminata.", "error");
+            }
+        });
     }
 
     function updateCameraLockUI(scene) {
+        if (!btnLockCamera) return;
         if (scene.cameraLocked) {
-            btnLockCamera.innerText = '🔒 Camera Bloccata'; btnLockCamera.style.background = '#d9534f';
+            btnLockCamera.innerHTML = '<span class="material-symbols-rounded">lock</span> Sblocca Mappa'; 
+            btnLockCamera.className = 'row-btn btn-danger';
         } else {
-            btnLockCamera.innerText = '🔓 Camera Sbloccata'; btnLockCamera.style.background = '#333';
+            btnLockCamera.innerHTML = '<span class="material-symbols-rounded">lock_open</span> Blocca Mappa'; 
+            btnLockCamera.className = 'row-btn';
         }
     }
 
-    function createLayerDOM(mediaSrc, naturalWidth, naturalHeight, fogRatio, existingFogData = null, isVideo = false, ytId = null) {
+    function createLayerDOM(mediaSrc, naturalWidth, naturalHeight, fogRatio, existingFogData = null, existingHlData = null, isVideo = false, ytId = null) {
         return new Promise((resolve) => {
             let mediaEl;
             
@@ -407,7 +548,6 @@ try {
                 mediaEl.allow = "autoplay; encrypted-media";
                 mediaEl.setAttribute("referrerpolicy", "strict-origin-when-cross-origin");
                 mediaEl.style.backgroundColor = "#000";
-                setTimeout(finalizeDOM, 50); 
             } else if (isVideo) {
                 mediaEl = document.createElement('video');
                 mediaEl.autoplay = true; mediaEl.loop = true; mediaEl.muted = true; mediaEl.playsInline = true;
@@ -415,46 +555,44 @@ try {
                 mediaEl.addEventListener('timeupdate', function() {
                     if (this.duration && this.currentTime >= this.duration - 0.15) { this.currentTime = 0; this.play(); }
                 });
-                if (mediaSrc) { mediaEl.onloadeddata = finalizeDOM; mediaEl.src = mediaSrc; mediaEl.load(); } 
-                else { setTimeout(finalizeDOM, 10); }
+                if (mediaSrc) { mediaEl.src = mediaSrc; mediaEl.load(); } 
             } else {
                 mediaEl = new Image();
-                if (mediaSrc) { mediaEl.onload = finalizeDOM; mediaEl.src = mediaSrc; } 
-                else { setTimeout(finalizeDOM, 10); }
+                if (mediaSrc) { mediaEl.src = mediaSrc; } 
             }
 
-            function finalizeDOM() {
-                const wrapper = document.createElement('div');
-                wrapper.className = 'layer-wrapper';
-                wrapper.style.width = naturalWidth + 'px'; 
-                wrapper.style.height = naturalHeight + 'px';
-                mediaEl.className = 'layer-img'; 
-                wrapper.appendChild(mediaEl);
-                
-                const atmosphere = document.createElement('div');
-                atmosphere.className = 'layer-atmosphere';
-                wrapper.appendChild(atmosphere);
-                
-                const canvas = document.createElement('canvas');
-                canvas.className = 'fog-canvas';
-                canvas.width = naturalWidth * fogRatio; 
-                canvas.height = naturalHeight * fogRatio;
-                const ctx = canvas.getContext('2d');
-                wrapper.appendChild(canvas);
+            const wrapper = document.createElement('div');
+            wrapper.className = 'layer-wrapper';
+            wrapper.style.width = naturalWidth + 'px'; 
+            wrapper.style.height = naturalHeight + 'px';
+            mediaEl.className = 'layer-img'; 
+            wrapper.appendChild(mediaEl);
+            
+            const atmosphere = document.createElement('div');
+            atmosphere.className = 'layer-atmosphere';
+            wrapper.appendChild(atmosphere);
+            
+            const canvas = document.createElement('canvas');
+            canvas.className = 'fog-canvas';
+            canvas.width = naturalWidth * fogRatio; 
+            canvas.height = naturalHeight * fogRatio;
+            const ctx = canvas.getContext('2d');
+            wrapper.appendChild(canvas);
 
-                const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-                svg.setAttribute("class", "layer-drawings");
-                svg.setAttribute("viewBox", `0 0 ${naturalWidth} ${naturalHeight}`);
-                wrapper.appendChild(svg);
+            const hlCanvas = document.createElement('canvas');
+            hlCanvas.className = 'hl-canvas';
+            hlCanvas.width = naturalWidth * fogRatio; 
+            hlCanvas.height = naturalHeight * fogRatio;
+            const hlCtx = hlCanvas.getContext('2d');
+            wrapper.appendChild(hlCanvas);
 
-                if (existingFogData) {
-                    const fogImg = new Image();
-                    fogImg.onload = () => { ctx.drawImage(fogImg, 0, 0); resolve({ wrapper, canvas, ctx, mediaEl, atmosphereEl: atmosphere, svg }); };
-                    fogImg.src = existingFogData;
-                } else {
-                    resolve({ wrapper, canvas, ctx, mediaEl, atmosphereEl: atmosphere, svg });
-                }
-            }
+            let fogPromise = existingFogData ? new Promise(r => { let img = new Image(); img.onload = () => { ctx.drawImage(img, 0, 0); r(); }; img.src = existingFogData; }) : Promise.resolve();
+            let hlPromise = existingHlData ? new Promise(r => { let img = new Image(); img.onload = () => { hlCtx.drawImage(img, 0, 0); r(); }; img.src = existingHlData; }) : Promise.resolve();
+            let mediaPromise = (!ytId && mediaSrc) ? new Promise(r => { if(isVideo) { mediaEl.onloadeddata = r; } else { mediaEl.onload = r; } }) : Promise.resolve();
+
+            Promise.all([fogPromise, hlPromise, mediaPromise]).then(() => {
+                resolve({ wrapper, canvas, ctx, hlCanvas, hlCtx, mediaEl, atmosphereEl: atmosphere });
+            });
         });
     }
 
@@ -475,6 +613,7 @@ try {
         scene.layers.forEach(l => updateLayerTransform(l));
         renderLayers();
         applyLayerAtmosphere(newLayer);
+        showToast("Livello aggiunto!", "success");
     }
 
     function updateLayerTransform(layer) {
@@ -491,11 +630,24 @@ try {
     function renameLayer(id) {
         const scene = scenes.find(s => s.id === currentSceneId);
         const layer = scene.layers.find(l => l.id === id);
-        const newName = prompt("Inserisci il nuovo nome del livello:", layer.name);
-        if (newName) { layer.name = newName; renderLayers(); }
+        showCustomModal("Inserisci il nuovo nome del livello:", true, layer.name, (newName) => {
+            if (newName && newName.trim() !== "") {
+                layer.name = newName;
+                renderLayers();
+            }
+        });
     }
 
     // --- EVENT LISTENERS UI ---
+
+    document.querySelectorAll('.color-swatch').forEach(btn => {
+        btn.onclick = () => {
+            document.querySelectorAll('.color-swatch').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            currentHlColor = btn.dataset.color;
+            updateToolUI('hl-draw'); 
+        };
+    });
 
     document.getElementById('atmosphere-select').onchange = (e) => {
         const scene = scenes.find(s => s.id === currentSceneId);
@@ -504,19 +656,8 @@ try {
             layer.filter = e.target.value; 
             applyLayerAtmosphere(layer); 
         } else {
-            alert("Seleziona prima un livello per applicare un filtro meteo.");
+            showToast("Seleziona prima un livello.", "error");
             e.target.value = 'none';
-        }
-    };
-    
-    document.getElementById('clear-drawings').onclick = () => {
-        const scene = scenes.find(s => s.id === currentSceneId);
-        const layer = scene?.layers.find(l => l.id === activeLayerId);
-        if(layer) { 
-            layer.drawings = []; 
-            renderLayerDrawings(layer); 
-        } else {
-            alert("Seleziona prima un livello su cui vuoi cancellare i disegni.");
         }
     };
 
@@ -525,35 +666,37 @@ try {
         if (!scene) return;
         scene.cameraLocked = !scene.cameraLocked;
         updateCameraLockUI(scene);
+        showToast(scene.cameraLocked ? "Mappa bloccata" : "Mappa sbloccata");
     };
 
     document.getElementById('btn-upload-trigger').onclick = () => document.getElementById('upload-layer').click();
 
-    document.getElementById('btn-yt-layer').onclick = async () => {
-        const url = prompt("Incolla qui il link del video di YouTube:");
-        if (!url) return;
-        const ytId = extractYouTubeID(url);
-        if (!ytId) { alert("Link non valido!"); return; }
+    document.getElementById('btn-yt-layer').onclick = () => {
+        showCustomModal("Incolla qui il link del video di YouTube:", true, "", async (url) => {
+            if (!url) return;
+            const ytId = extractYouTubeID(url);
+            if (!ytId) { showToast("Link non valido!", "error"); return; }
 
-        const scene = scenes.find(s => s.id === currentSceneId);
-        if (!scene) return;
+            const scene = scenes.find(s => s.id === currentSceneId);
+            if (!scene) return;
 
-        loadingOverlay.style.display = 'flex';
-        const nWidth = 1920; const nHeight = 1080;
-        const fogRatio = MAX_FOG_RES / Math.max(nWidth, nHeight);
+            loadingOverlay.style.display = 'flex';
+            const nWidth = 1920; const nHeight = 1080;
+            const fogRatio = MAX_FOG_RES / Math.max(nWidth, nHeight);
 
-        const domElements = await createLayerDOM(null, nWidth, nHeight, fogRatio, null, false, ytId);
+            const domElements = await createLayerDOM(null, nWidth, nHeight, fogRatio, null, null, false, ytId);
 
-        layerCounter++;
-        const newLayer = {
-            id: layerCounter, name: `YouTube Mappa`, fileName: `YT: ${ytId}`, imgSrc: null, ytId: ytId, 
-            nWidth: nWidth, nHeight: nHeight, wrapper: domElements.wrapper, canvas: domElements.canvas, ctx: domElements.ctx, mediaEl: domElements.mediaEl, atmosphereEl: domElements.atmosphereEl, svg: domElements.svg,
-            fogRatio: fogRatio, x: 0, y: 0, scale: 1, rotation: 0, volume: 0, visible: true, lockMove: false, lockScale: false,
-            isVideo: false, needsRelink: false, drawings: [], filter: 'none'
-        };
-        
-        finalizeLayerAddition(scene, newLayer, nWidth, nHeight);
-        loadingOverlay.style.display = 'none';
+            layerCounter++;
+            const newLayer = {
+                id: layerCounter, name: `Mappa YouTube`, fileName: `YT: ${ytId}`, imgSrc: null, ytId: ytId, 
+                nWidth: nWidth, nHeight: nHeight, wrapper: domElements.wrapper, canvas: domElements.canvas, ctx: domElements.ctx, hlCanvas: domElements.hlCanvas, hlCtx: domElements.hlCtx, mediaEl: domElements.mediaEl, atmosphereEl: domElements.atmosphereEl,
+                fogRatio: fogRatio, x: 0, y: 0, scale: 1, rotation: 0, volume: 0, visible: true, lockMove: false, lockScale: false,
+                isVideo: false, needsRelink: false, filter: 'none'
+            };
+            
+            finalizeLayerAddition(scene, newLayer, nWidth, nHeight);
+            loadingOverlay.style.display = 'none';
+        });
     };
 
     document.getElementById('upload-layer').addEventListener('change', (e) => {
@@ -567,14 +710,14 @@ try {
         
         const processMedia = async (nWidth, nHeight) => {
             const fogRatio = Math.max(nWidth, nHeight) > MAX_FOG_RES ? MAX_FOG_RES / Math.max(nWidth, nHeight) : 1;
-            const domElements = await createLayerDOM(objectUrl, nWidth, nHeight, fogRatio, null, isVideo);
+            const domElements = await createLayerDOM(objectUrl, nWidth, nHeight, fogRatio, null, null, isVideo);
 
             layerCounter++;
             const newLayer = {
                 id: layerCounter, name: `Livello ${scene.layers.length + 1}`, fileName: file.name, imgSrc: isVideo ? null : objectUrl, ytId: null,
-                nWidth: nWidth, nHeight: nHeight, wrapper: domElements.wrapper, canvas: domElements.canvas, ctx: domElements.ctx, mediaEl: domElements.mediaEl, atmosphereEl: domElements.atmosphereEl, svg: domElements.svg,
+                nWidth: nWidth, nHeight: nHeight, wrapper: domElements.wrapper, canvas: domElements.canvas, ctx: domElements.ctx, hlCanvas: domElements.hlCanvas, hlCtx: domElements.hlCtx, mediaEl: domElements.mediaEl, atmosphereEl: domElements.atmosphereEl,
                 fogRatio: fogRatio, x: 0, y: 0, scale: 1, rotation: 0, volume: 0, visible: true, lockMove: false, lockScale: false,
-                isVideo: isVideo, needsRelink: false, drawings: [], filter: 'none'
+                isVideo: isVideo, needsRelink: false, filter: 'none'
             };
             
             finalizeLayerAddition(scene, newLayer, nWidth, nHeight);
@@ -604,7 +747,7 @@ try {
         const layer = scene?.layers.find(l => l.id === activeLayerId);
         if(layer) {
             layer.rotation = parseFloat(e.target.value);
-            rotDisplay.innerText = layer.rotation;
+            rotDisplay.innerText = layer.rotation + "°";
             updateLayerTransform(layer);
         }
     });
@@ -615,7 +758,7 @@ try {
         if(layer) {
             layer.rotation = 0;
             rotSlider.value = 0;
-            rotDisplay.innerText = "0";
+            rotDisplay.innerText = "0°";
             updateLayerTransform(layer);
         }
     };
@@ -625,7 +768,7 @@ try {
         const layer = scene?.layers.find(l => l.id === activeLayerId);
         if(layer && (layer.isVideo || layer.ytId)) {
             layer.volume = parseInt(e.target.value);
-            volDisplay.innerText = layer.volume;
+            volDisplay.innerText = layer.volume + "%";
             applyLayerVolume(layer);
         }
     });
@@ -646,38 +789,41 @@ try {
     document.getElementById('btn-save-project').onclick = () => {
         for (let s of scenes) {
             for (let l of s.layers) {
-                if (l.imgSrc && l.imgSrc.startsWith('blob:')) { alert(`Attendi elaborazione background per "${l.name}".`); return; }
+                if (l.imgSrc && l.imgSrc.startsWith('blob:')) { showToast(`Attendi elaborazione per "${l.name}"`, "error"); return; }
             }
         }
-        const customFileName = prompt("Inserisci il nome del salvataggio:", "Campagna_Dnd");
-        if (!customFileName) return; 
-
-        loadingOverlay.style.display = 'flex';
-        document.getElementById('loading-text').innerText = "Salvataggio in corso...";
         
-        setTimeout(() => {
-            try {
-                const projectData = {
-                    sceneCounter: sceneCounter, layerCounter: layerCounter,
-                    scenes: scenes.map(scene => ({
-                        id: scene.id, name: scene.name, panX: scene.panX, panY: scene.panY, scale: scene.scale, cameraLocked: scene.cameraLocked || false,
-                        layers: scene.layers.map(layer => ({
-                            id: layer.id, name: layer.name, fileName: layer.fileName || "Media",
-                            imgSrc: layer.imgSrc, ytId: layer.ytId || null, nWidth: layer.nWidth, nHeight: layer.nHeight, fogRatio: layer.fogRatio,
-                            fogData: layer.canvas.toDataURL(), x: layer.x, y: layer.y, scale: layer.scale, rotation: layer.rotation || 0, volume: layer.volume || 0,
-                            visible: layer.visible, lockMove: layer.lockMove, lockScale: layer.lockScale, isVideo: layer.isVideo || false,
-                            drawings: layer.drawings || [], filter: layer.filter || 'none'
+        showCustomModal("Inserisci il nome del salvataggio:", true, "Campagna_Dnd", (customFileName) => {
+            if (!customFileName || customFileName.trim() === "") return; 
+
+            loadingOverlay.style.display = 'flex';
+            document.getElementById('loading-text').innerText = "Salvataggio in corso...";
+            
+            setTimeout(() => {
+                try {
+                    const projectData = {
+                        sceneCounter: sceneCounter, layerCounter: layerCounter,
+                        scenes: scenes.map(scene => ({
+                            id: scene.id, name: scene.name, panX: scene.panX, panY: scene.panY, scale: scene.scale, cameraLocked: scene.cameraLocked || false,
+                            layers: scene.layers.map(layer => ({
+                                id: layer.id, name: layer.name, fileName: layer.fileName || "Media",
+                                imgSrc: layer.imgSrc, ytId: layer.ytId || null, nWidth: layer.nWidth, nHeight: layer.nHeight, fogRatio: layer.fogRatio,
+                                fogData: layer.canvas.toDataURL(), hlData: layer.hlCanvas.toDataURL(), x: layer.x, y: layer.y, scale: layer.scale, rotation: layer.rotation || 0, volume: layer.volume || 0,
+                                visible: layer.visible, lockMove: layer.lockMove, lockScale: layer.lockScale, isVideo: layer.isVideo || false,
+                                filter: layer.filter || 'none'
+                            }))
                         }))
-                    }))
-                };
-                const blob = new Blob([JSON.stringify(projectData)], { type: "application/json" });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a'); a.href = url;
-                a.download = customFileName.endsWith('.json') ? customFileName : customFileName + ".json";
-                document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
-            } catch (error) { alert("Errore durante il salvataggio."); }
-            loadingOverlay.style.display = 'none';
-        }, 100);
+                    };
+                    const blob = new Blob([JSON.stringify(projectData)], { type: "application/json" });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a'); a.href = url;
+                    a.download = customFileName.endsWith('.json') ? customFileName : customFileName + ".json";
+                    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+                    showToast("Progetto salvato con successo!", "success");
+                } catch (error) { showToast("Errore durante il salvataggio.", "error"); }
+                loadingOverlay.style.display = 'none';
+            }, 100);
+        });
     };
 
     document.getElementById('btn-load-trigger').onclick = () => document.getElementById('upload-project').click();
@@ -685,7 +831,7 @@ try {
     document.getElementById('upload-project').addEventListener('change', (e) => {
         const file = e.target.files[0];
         if (!file) return;
-        loadingOverlay.style.display = 'flex'; document.getElementById('loading-text').innerText = "Caricamento istantaneo mappa...";
+        loadingOverlay.style.display = 'flex'; document.getElementById('loading-text').innerText = "Caricamento mappa...";
         
         const reader = new FileReader();
         reader.onload = async (event) => {
@@ -710,27 +856,28 @@ try {
                         const needsRelink = isVid && !layerData.imgSrc && !ytId; 
                         const domSrc = safeBase64ToBlobUrl(layerData.imgSrc);
                         const domFog = layerData.fogData ? safeBase64ToBlobUrl(layerData.fogData) : null;
+                        const domHl = layerData.hlData ? safeBase64ToBlobUrl(layerData.hlData) : null;
 
-                        const domElements = await createLayerDOM(domSrc, layerData.nWidth, layerData.nHeight, layerData.fogRatio, domFog, isVid, ytId);
+                        const domElements = await createLayerDOM(domSrc, layerData.nWidth, layerData.nHeight, layerData.fogRatio, domFog, domHl, isVid, ytId);
                         
                         const createdLayer = {
                             id: layerData.id, name: layerData.name, fileName: layerData.fileName,
                             imgSrc: layerData.imgSrc, ytId: ytId, nWidth: layerData.nWidth, nHeight: layerData.nHeight, fogRatio: layerData.fogRatio,
-                            wrapper: domElements.wrapper, canvas: domElements.canvas, ctx: domElements.ctx, mediaEl: domElements.mediaEl, atmosphereEl: domElements.atmosphereEl, svg: domElements.svg,
+                            wrapper: domElements.wrapper, canvas: domElements.canvas, ctx: domElements.ctx, hlCanvas: domElements.hlCanvas, hlCtx: domElements.hlCtx, mediaEl: domElements.mediaEl, atmosphereEl: domElements.atmosphereEl,
                             x: layerData.x, y: layerData.y, scale: layerData.scale, rotation: layerData.rotation || 0, volume: layerData.volume || 0,
                             visible: layerData.visible, lockMove: layerData.lockMove || false, lockScale: layerData.lockScale || false,
-                            isVideo: isVid, needsRelink: needsRelink, drawings: layerData.drawings || [], filter: layerData.filter || 'none'
+                            isVideo: isVid, needsRelink: needsRelink, filter: layerData.filter || 'none'
                         };
                         newScene.layers.push(createdLayer);
-                        renderLayerDrawings(createdLayer);
                         applyLayerAtmosphere(createdLayer);
                         setTimeout(() => applyLayerVolume(createdLayer), 1500);
                     }
                     scenes.push(newScene);
                 }
                 if (scenes.length > 0) switchScene(scenes[0].id);
+                showToast("Campagna caricata con successo!", "success");
 
-            } catch (error) { alert("File di Campagna non valido."); console.error(error); }
+            } catch (error) { showToast("Errore: File non valido.", "error"); console.error(error); }
             loadingOverlay.style.display = 'none'; e.target.value = '';
         };
         reader.readAsText(file);
@@ -739,11 +886,30 @@ try {
     function renderSceneList() {
         sceneListEl.innerHTML = '';
         scenes.forEach(scene => {
-            const row = document.createElement('div'); row.className = `item-row ${scene.id === currentSceneId ? 'active' : ''}`;
-            const nameEl = document.createElement('div'); nameEl.className = 'item-name'; nameEl.innerText = scene.name; nameEl.onclick = () => switchScene(scene.id);
-            const btnEdit = document.createElement('button'); btnEdit.className = 'btn-icon'; btnEdit.innerText = '✏️'; btnEdit.onclick = () => renameScene(scene.id);
-            const btnDel = document.createElement('button'); btnDel.className = 'btn-icon'; btnDel.innerText = '🗑️'; btnDel.onclick = () => deleteScene(scene.id);
-            row.appendChild(nameEl); row.appendChild(btnEdit); row.appendChild(btnDel); sceneListEl.appendChild(row);
+            const container = document.createElement('div');
+            container.className = `scene-item ${scene.id === currentSceneId ? 'active' : ''}`;
+            container.onclick = () => switchScene(scene.id);
+
+            const topRow = document.createElement('div'); topRow.className = 'layer-top-row';
+            const nameWrap = document.createElement('div'); nameWrap.className = 'layer-name-wrap';
+            nameWrap.innerHTML = `<span class="material-symbols-rounded">movie</span> ${scene.name}`;
+
+            const btns = document.createElement('div'); btns.style.display = 'flex'; btns.style.gap = '6px';
+            
+            const btnEdit = document.createElement('button'); btnEdit.className = 'mini-btn'; btnEdit.innerHTML = '<span class="material-symbols-rounded">edit</span>'; 
+            btnEdit.title = "Rinomina Scena";
+            btnEdit.onclick = (e) => { e.stopPropagation(); renameScene(scene.id); };
+            
+            const btnDel = document.createElement('button'); btnDel.className = 'mini-btn danger'; btnDel.innerHTML = '<span class="material-symbols-rounded">delete</span>'; 
+            btnDel.title = "Elimina Scena";
+            btnDel.onclick = (e) => { e.stopPropagation(); deleteScene(scene.id); };
+            
+            btns.appendChild(btnEdit);
+            btns.appendChild(btnDel);
+            topRow.appendChild(nameWrap);
+            topRow.appendChild(btns);
+            container.appendChild(topRow);
+            sceneListEl.appendChild(container);
         });
     }
 
@@ -752,8 +918,9 @@ try {
         layerListEl.innerHTML = '';
         
         if (!scene) {
-            rotSlider.value = 0; rotDisplay.innerText = "0";
-            volSlider.value = 0; volDisplay.innerText = "0"; volSlider.disabled = true; 
+            rotSlider.value = 0; rotDisplay.innerText = "0°";
+            if(volumeWrapper) volumeWrapper.style.display = 'none';
+            volSlider.disabled = true; 
             document.getElementById('atmosphere-select').value = 'none';
             return;
         }
@@ -761,29 +928,68 @@ try {
         if (activeLayerId) {
             const activeL = scene.layers.find(l => l.id === activeLayerId);
             if (activeL) {
-                rotSlider.value = activeL.rotation || 0; rotDisplay.innerText = activeL.rotation || 0;
+                rotSlider.value = activeL.rotation || 0; rotDisplay.innerText = (activeL.rotation || 0) + "°";
                 document.getElementById('atmosphere-select').value = activeL.filter || 'none';
+                
                 if(activeL.isVideo || activeL.ytId) {
-                    volSlider.disabled = false; volSlider.value = activeL.volume || 0; volDisplay.innerText = activeL.volume || 0;
+                    if(volumeWrapper) volumeWrapper.style.display = 'block';
+                    volSlider.disabled = false; 
+                    volSlider.value = activeL.volume || 0; 
+                    volDisplay.innerText = (activeL.volume || 0) + "%";
                 } else {
-                    volSlider.disabled = true; volSlider.value = 0; volDisplay.innerText = "0";
+                    if(volumeWrapper) volumeWrapper.style.display = 'none';
+                    volSlider.disabled = true; 
+                    volSlider.value = 0; 
+                    volDisplay.innerText = "0%";
                 }
             }
         } else {
-            rotSlider.value = 0; rotDisplay.innerText = "0";
-            volSlider.value = 0; volDisplay.innerText = "0"; volSlider.disabled = true;
+            rotSlider.value = 0; rotDisplay.innerText = "0°";
+            if(volumeWrapper) volumeWrapper.style.display = 'none';
+            volSlider.disabled = true;
             document.getElementById('atmosphere-select').value = 'none';
         }
 
         [...scene.layers].reverse().forEach(layer => {
-            const row = document.createElement('div'); row.className = `item-row ${layer.id === activeLayerId ? 'active' : ''}`;
+            const container = document.createElement('div'); 
+            container.className = `layer-item-container ${layer.id === activeLayerId ? 'active' : ''}`;
+            container.onclick = () => { activeLayerId = layer.id; if(currentMode === 'camera') updateToolUI('layer'); else renderLayers(); };
+
+            const topRow = document.createElement('div'); topRow.className = 'layer-top-row';
+            const nameWrap = document.createElement('div'); nameWrap.className = 'layer-name-wrap';
+            const iconStr = layer.ytId ? "smart_display" : (layer.isVideo ? "movie" : "image");
+            nameWrap.innerHTML = `<span class="material-symbols-rounded" style="font-size:16px;">${iconStr}</span> ${layer.name}`;
             
-            const nameEl = document.createElement('div'); 
-            nameEl.className = 'item-name'; 
-            nameEl.innerText = layer.name + (layer.ytId ? " 🔴" : (layer.isVideo ? " 🎥" : "")); 
-            nameEl.onclick = () => { activeLayerId = layer.id; if(currentMode === 'camera') updateToolUI('layer'); else renderLayers(); };
+            const topBtns = document.createElement('div'); topBtns.style.display = 'flex'; topBtns.style.gap = '6px';
             
-            const btnUp = document.createElement('button'); btnUp.className = 'btn-icon'; btnUp.innerText = '🔼'; btnUp.title = "Sposta Su";
+            const btnVis = document.createElement('button'); btnVis.className = `mini-btn ${layer.visible ? '' : 'danger'}`; 
+            btnVis.innerHTML = `<span class="material-symbols-rounded">${layer.visible ? 'visibility' : 'visibility_off'}</span>`;
+            btnVis.title = "Visibilità"; btnVis.onclick = (e) => { e.stopPropagation(); layer.visible = !layer.visible; updateLayerTransform(layer); renderLayers(); };
+            
+            const btnDel = document.createElement('button'); btnDel.className = 'mini-btn danger'; 
+            btnDel.innerHTML = '<span class="material-symbols-rounded">delete</span>';
+            btnDel.onclick = (e) => { 
+                e.stopPropagation();
+                showCustomModal(`Eliminare il livello "${layer.name}"?`, false, null, (yes) => {
+                    if(yes) {
+                        scene.layers = scene.layers.filter(l => l.id !== layer.id); 
+                        if (activeLayerId === layer.id) activeLayerId = null; 
+                        layer.wrapper.remove(); 
+                        scene.layers.forEach(l => updateLayerTransform(l));
+                        renderLayers(); 
+                    }
+                });
+            };
+
+            topBtns.appendChild(btnVis);
+            topBtns.appendChild(btnDel);
+            topRow.appendChild(nameWrap);
+            topRow.appendChild(topBtns);
+
+            const botRow = document.createElement('div'); botRow.className = 'layer-bottom-grid';
+
+            const btnUp = document.createElement('button'); btnUp.className = 'mini-btn'; 
+            btnUp.innerHTML = '<span class="material-symbols-rounded">arrow_upward</span>'; btnUp.title = "Sposta Su";
             btnUp.onclick = (e) => { 
                 e.stopPropagation(); 
                 const idx = scene.layers.indexOf(layer);
@@ -795,7 +1001,8 @@ try {
                 }
             };
             
-            const btnDown = document.createElement('button'); btnDown.className = 'btn-icon'; btnDown.innerText = '🔽'; btnDown.title = "Sposta Giù";
+            const btnDown = document.createElement('button'); btnDown.className = 'mini-btn'; 
+            btnDown.innerHTML = '<span class="material-symbols-rounded">arrow_downward</span>'; btnDown.title = "Sposta Giù";
             btnDown.onclick = (e) => { 
                 e.stopPropagation(); 
                 const idx = scene.layers.indexOf(layer);
@@ -807,41 +1014,36 @@ try {
                 }
             };
 
-            const btnVis = document.createElement('button'); btnVis.className = `btn-icon ${layer.visible ? '' : 'danger'}`; btnVis.innerText = layer.visible ? '👁️' : '❌'; 
-            btnVis.title = "Visibilità"; btnVis.onclick = (e) => { e.stopPropagation(); layer.visible = !layer.visible; updateLayerTransform(layer); renderLayers(); };
-            
-            const btnLockMove = document.createElement('button'); btnLockMove.className = `btn-icon ${layer.lockMove ? 'danger' : ''}`; btnLockMove.innerText = layer.lockMove ? '📍' : '✋'; 
+            const btnLockMove = document.createElement('button'); btnLockMove.className = `mini-btn ${layer.lockMove ? 'danger' : ''}`; 
+            btnLockMove.innerHTML = `<span class="material-symbols-rounded">${layer.lockMove ? 'push_pin' : 'drag_pan'}</span>`; 
             btnLockMove.title = "Blocca Movimento"; btnLockMove.onclick = (e) => { e.stopPropagation(); layer.lockMove = !layer.lockMove; renderLayers(); };
 
-            const btnLockScale = document.createElement('button'); btnLockScale.className = `btn-icon ${layer.lockScale ? 'danger' : ''}`; btnLockScale.innerText = layer.lockScale ? '🔒' : '🔎'; 
+            const btnLockScale = document.createElement('button'); btnLockScale.className = `mini-btn ${layer.lockScale ? 'danger' : ''}`; 
+            btnLockScale.innerHTML = `<span class="material-symbols-rounded">${layer.lockScale ? 'zoom_out_map' : 'search'}</span>`; 
             btnLockScale.title = "Blocca Zoom"; btnLockScale.onclick = (e) => { e.stopPropagation(); layer.lockScale = !layer.lockScale; renderLayers(); };
             
-            const btnRename = document.createElement('button'); btnRename.className = 'btn-icon'; btnRename.innerText = '✏️'; btnRename.onclick = (e) => { e.stopPropagation(); renameLayer(layer.id); };
-            const btnDel = document.createElement('button'); btnDel.className = 'btn-icon'; btnDel.innerText = '🗑️'; 
-            btnDel.onclick = (e) => { 
-                e.stopPropagation();
-                scene.layers = scene.layers.filter(l => l.id !== layer.id); 
-                if (activeLayerId === layer.id) activeLayerId = null; 
-                layer.wrapper.remove(); 
-                scene.layers.forEach(l => updateLayerTransform(l));
-                renderLayers(); 
-            };
+            const btnRename = document.createElement('button'); btnRename.className = 'mini-btn'; 
+            btnRename.innerHTML = '<span class="material-symbols-rounded">edit</span>'; btnRename.title = "Rinomina Livello"; 
+            btnRename.onclick = (e) => { e.stopPropagation(); renameLayer(layer.id); };
+            
+            botRow.appendChild(btnUp);
+            botRow.appendChild(btnDown);
+            botRow.appendChild(btnLockMove);
+            botRow.appendChild(btnLockScale);
+            botRow.appendChild(btnRename);
 
-            row.appendChild(nameEl); 
-            row.appendChild(btnUp); 
-            row.appendChild(btnDown);
-            row.appendChild(btnVis); 
-            row.appendChild(btnLockMove); 
-            row.appendChild(btnLockScale); 
-            row.appendChild(btnRename); 
-            row.appendChild(btnDel);
+            container.appendChild(topRow);
+            container.appendChild(botRow);
             
             if (layer.needsRelink) {
-                const btnRelink = document.createElement('button'); btnRelink.className = 'btn-relink'; btnRelink.innerText = `🎥 Ricarica: ${layer.fileName}`;
+                const btnRelink = document.createElement('button'); btnRelink.className = 'row-btn btn-warning'; 
+                btnRelink.style.padding = "6px"; btnRelink.style.marginTop = "4px";
+                btnRelink.innerHTML = `<span class="material-symbols-rounded" style="font-size:16px;">sync</span> Ricarica Media`;
                 btnRelink.onclick = (e) => { e.stopPropagation(); layerToRelink = layer; document.getElementById('upload-relink').click(); };
-                row.appendChild(btnRelink);
+                container.appendChild(btnRelink);
             }
-            layerListEl.appendChild(row);
+            
+            layerListEl.appendChild(container);
         });
     }
 
@@ -871,9 +1073,6 @@ try {
         let newScale = Math.max(0.05, Math.min(scene.scale * factor, 15));
         applyWorldTransform(centerX - (worldX * newScale), centerY - (worldY * newScale), newScale);
     }
-
-    document.getElementById('btn-zoom-in').onclick = () => doGlobalZoom(1.2);
-    document.getElementById('btn-zoom-out').onclick = () => doGlobalZoom(0.8);
     
     viewport.addEventListener('wheel', (e) => { 
         e.preventDefault(); 
@@ -885,25 +1084,43 @@ try {
     }, {passive: false});
 
     const tools = { 
-        'camera': document.getElementById('tool-camera'), 'layer': document.getElementById('tool-layer'), 
-        'draw': document.getElementById('tool-draw'), 'erase': document.getElementById('tool-erase'),
-        'hl-red': document.getElementById('tool-hl-red'), 'hl-green': document.getElementById('tool-hl-green'), 'hl-yellow': document.getElementById('tool-hl-yellow')
+        'camera': document.getElementById('tool-camera'), 
+        'layer': document.getElementById('tool-layer'), 
+        'draw': document.getElementById('tool-draw'), 
+        'erase': document.getElementById('tool-erase'),
+        'hl-draw': document.getElementById('tool-hl-draw'), 
+        'hl-erase': document.getElementById('tool-hl-erase')
     };
     
     function updateToolUI(mode) {
         currentMode = mode;
         Object.values(tools).forEach(btn => { if(btn) btn.classList.remove('active'); });
         if(tools[mode]) tools[mode].classList.add('active');
-        if ((mode === 'layer' || mode === 'draw' || mode === 'erase') && !activeLayerId) {
+        
+        subColors.style.display = 'none';
+        subBrushSize.style.display = 'none';
+        subCameraLock.style.display = 'none';
+
+        if (mode === 'camera') {
+            subToolbar.classList.remove('hidden');
+            subCameraLock.style.display = 'block';
+        } else if (['draw', 'erase', 'hl-draw', 'hl-erase'].includes(mode)) {
+            subToolbar.classList.remove('hidden');
+            subBrushSize.style.display = 'flex';
+            if (mode === 'hl-draw') {
+                subColors.style.display = 'flex';
+            }
+        } else {
+            subToolbar.classList.add('hidden');
+        }
+
+        if ((['layer', 'draw', 'erase', 'hl-draw', 'hl-erase'].includes(mode)) && !activeLayerId) {
             const scene = scenes.find(s => s.id === currentSceneId);
             if (scene && scene.layers.length > 0) { activeLayerId = scene.layers[scene.layers.length - 1].id; renderLayers(); }
         }
     }
     
     Object.keys(tools).forEach(mode => { if(tools[mode]) tools[mode].onclick = () => updateToolUI(mode); });
-
-    document.getElementById('clear-fog').onclick = () => { const scene = scenes.find(s => s.id === currentSceneId); const layer = scene?.layers.find(l => l.id === activeLayerId); if(layer) layer.ctx.clearRect(0, 0, layer.canvas.width, layer.canvas.height); else alert("Seleziona un livello!"); };
-    document.getElementById('fill-fog').onclick = () => { const scene = scenes.find(s => s.id === currentSceneId); const layer = scene?.layers.find(l => l.id === activeLayerId); if(layer) { layer.ctx.globalCompositeOperation = 'source-over'; layer.ctx.fillStyle = 'black'; layer.ctx.fillRect(0, 0, layer.canvas.width, layer.canvas.height); } else alert("Seleziona un livello!"); };
 
     function getPointerPos(e) { return (e.touches && e.touches.length > 0) ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : { x: e.clientX, y: e.clientY }; }
     function getDist(touches) { return Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY); }
@@ -923,17 +1140,8 @@ try {
         return { x: localX, y: localY };
     }
 
-    function performDraw() {
-        if (!isInteracting || (currentMode !== 'draw' && currentMode !== 'erase')) { pendingDraw = false; return; }
-        const scene = scenes.find(s => s.id === currentSceneId);
-        const layer = scene?.layers.find(l => l.id === activeLayerId);
-        if(layer) { layer.ctx.beginPath(); layer.ctx.moveTo(drawLastX, drawLastY); layer.ctx.lineTo(drawCurrX, drawCurrY); layer.ctx.stroke(); }
-        drawLastX = drawCurrX; drawLastY = drawCurrY;
-        pendingDraw = false;
-    }
-
     function handleStart(e) {
-        if(e.target.closest('#ui-panel') || e.target.closest('#reveal-ui')) return;
+        if(e.target.closest('.glass-panel') || e.target.closest('#reveal-ui') || e.target.closest('#toast-container') || e.target.closest('#custom-modal-overlay')) return;
         
         const currentTime = new Date().getTime();
         if (currentTime - lastTapTime < 300 && (!e.touches || e.touches.length === 1)) {
@@ -955,7 +1163,7 @@ try {
         const pos = getPointerPos(e);
 
         pingTimer = setTimeout(() => {
-            isInteracting = false; currentPath = null;
+            isInteracting = false; 
             const wPos = getWorldCoords(pos.x, pos.y, scene);
             triggerPing(wPos.x, wPos.y);
         }, 500);
@@ -967,14 +1175,6 @@ try {
             if (!activeLayer.lockMove) {
                 startX = ((pos.x - scene.panX) / scene.scale) - activeLayer.x; startY = ((pos.y - scene.panY) / scene.scale) - activeLayer.y;
             }
-        } else if (currentMode.startsWith('hl-') && activeLayer) {
-            const rawPos = getLayerLocalCoordsRaw(pos.x, pos.y, scene, activeLayer);
-            const colorMap = { 'hl-red': '#ff3333', 'hl-green': '#33ff33', 'hl-yellow': '#ffff33' };
-            const brushThickness = document.getElementById('brush-size').value / scene.scale / activeLayer.scale;
-            currentPath = { color: colorMap[currentMode], width: brushThickness, points: [rawPos] };
-            if (!activeLayer.drawings) activeLayer.drawings = [];
-            activeLayer.drawings.push(currentPath);
-            renderLayerDrawings(activeLayer);
         } else if ((currentMode === 'draw' || currentMode === 'erase') && activeLayer) {
             const rawPos = getLayerLocalCoordsRaw(pos.x, pos.y, scene, activeLayer);
             activeLayer.ctx.lineWidth = (document.getElementById('brush-size').value / scene.scale / activeLayer.scale) * activeLayer.fogRatio;
@@ -985,6 +1185,24 @@ try {
             drawCurrY = rawPos.y * activeLayer.fogRatio;
             drawLastX = drawCurrX; drawLastY = drawCurrY;
             activeLayer.ctx.beginPath(); activeLayer.ctx.moveTo(drawCurrX, drawCurrY); activeLayer.ctx.lineTo(drawCurrX+0.1, drawCurrY+0.1); activeLayer.ctx.stroke();
+        } 
+        else if ((currentMode === 'hl-draw' || currentMode === 'hl-erase') && activeLayer) {
+            const rawPos = getLayerLocalCoordsRaw(pos.x, pos.y, scene, activeLayer);
+            activeLayer.hlCtx.lineWidth = (document.getElementById('brush-size').value / scene.scale / activeLayer.scale) * activeLayer.fogRatio;
+            activeLayer.hlCtx.lineCap = 'round'; activeLayer.hlCtx.lineJoin = 'round';
+            
+            if (currentMode === 'hl-draw') {
+                activeLayer.hlCtx.globalCompositeOperation = 'source-over';
+                activeLayer.hlCtx.strokeStyle = currentHlColor;
+            } else {
+                activeLayer.hlCtx.globalCompositeOperation = 'destination-out';
+                activeLayer.hlCtx.strokeStyle = 'rgba(0,0,0,1)';
+            }
+            
+            drawCurrX = rawPos.x * activeLayer.fogRatio; 
+            drawCurrY = rawPos.y * activeLayer.fogRatio;
+            drawLastX = drawCurrX; drawLastY = drawCurrY;
+            activeLayer.hlCtx.beginPath(); activeLayer.hlCtx.moveTo(drawCurrX, drawCurrY); activeLayer.hlCtx.lineTo(drawCurrX+0.1, drawCurrY+0.1); activeLayer.hlCtx.stroke();
         }
     }
 
@@ -1021,23 +1239,6 @@ try {
                 activeLayer.y = ((pos.y - scene.panY) / scene.scale) - startY; 
                 updateLayerTransform(activeLayer);
             }
-        } else if (currentMode.startsWith('hl-') && currentPath && activeLayer) {
-            const rawPos = getLayerLocalCoordsRaw(pos.x, pos.y, scene, activeLayer);
-            currentPath.points.push(rawPos);
-            
-            if (!pendingDraw) {
-                pendingDraw = true;
-                requestAnimationFrame(() => {
-                    if (currentPath && activeLayer && activeLayer.svg) {
-                        const polylines = activeLayer.svg.querySelectorAll('polyline');
-                        if (polylines.length > 0) {
-                            const lastPoly = polylines[polylines.length - 1];
-                            lastPoly.setAttribute("points", currentPath.points.map(p => `${p.x},${p.y}`).join(" "));
-                        }
-                    }
-                    pendingDraw = false;
-                });
-            }
         } else if ((currentMode === 'draw' || currentMode === 'erase') && activeLayer) {
             const rawPos = getLayerLocalCoordsRaw(pos.x, pos.y, scene, activeLayer);
             drawCurrX = rawPos.x * activeLayer.fogRatio; 
@@ -1050,38 +1251,66 @@ try {
                 });
             }
         }
+        else if ((currentMode === 'hl-draw' || currentMode === 'hl-erase') && activeLayer) {
+            const rawPos = getLayerLocalCoordsRaw(pos.x, pos.y, scene, activeLayer);
+            drawCurrX = rawPos.x * activeLayer.fogRatio; 
+            drawCurrY = rawPos.y * activeLayer.fogRatio;
+            if (!pendingDraw) {
+                pendingDraw = true;
+                requestAnimationFrame(() => {
+                    activeLayer.hlCtx.beginPath(); activeLayer.hlCtx.moveTo(drawLastX, drawLastY); activeLayer.hlCtx.lineTo(drawCurrX, drawCurrY); activeLayer.hlCtx.stroke();
+                    drawLastX = drawCurrX; drawLastY = drawCurrY; pendingDraw = false;
+                });
+            }
+        }
     }
 
     function handleEnd(e) {
         if(pingTimer) { clearTimeout(pingTimer); pingTimer = null; }
         if (e.touches && e.touches.length < 2) { lastPinchDist = null; lastPinchMid = null; }
-        isInteracting = false; currentPath = null;
+        isInteracting = false;
     }
 
     viewport.addEventListener('mousedown', handleStart); viewport.addEventListener('mousemove', handleMove); window.addEventListener('mouseup', handleEnd);
     viewport.addEventListener('touchstart', handleStart, {passive: false}); viewport.addEventListener('touchmove', handleMove, {passive: false});
     window.addEventListener('touchend', handleEnd); window.addEventListener('touchcancel', handleEnd);
     
-    viewport.addEventListener('dblclick', (e) => {
-        if(e.target.closest('#ui-panel') || e.target.closest('#reveal-ui')) return;
-        toggleCinemaMode();
-    });
-
     document.getElementById('btn-fullscreen').onclick = () => {
         if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(err => console.log(err));
         else if (document.exitFullscreen) document.exitFullscreen();
     };
 
-    const uiPanel = document.getElementById('ui-panel');
+    const leftToolbar = document.getElementById('left-toolbar');
+    const rightPanel = document.getElementById('right-panel');
     const revealUiBtn = document.getElementById('reveal-ui');
 
-    document.getElementById('hide-ui').onclick = () => { uiPanel.classList.add('hidden'); revealUiBtn.classList.remove('hidden'); isCinemaMode = false; };
-    revealUiBtn.onclick = () => { uiPanel.classList.remove('hidden'); revealUiBtn.classList.add('hidden'); isCinemaMode = false; };
+    // --- NUOVA LOGICA "NASCONDI" (Nasconde solo a destra) ---
+    document.getElementById('hide-ui').onclick = () => { 
+        rightPanel.classList.add('hidden'); 
+        revealUiBtn.classList.remove('hidden'); 
+    };
+    
+    revealUiBtn.onclick = () => { 
+        leftToolbar.classList.remove('hidden'); 
+        rightPanel.classList.remove('hidden'); 
+        updateToolUI(currentMode); 
+        revealUiBtn.classList.add('hidden'); 
+    };
 
+    // --- NUOVA LOGICA "CINEMA MODE" (Doppio tap per nascondere e mostrare tutto) ---
     function toggleCinemaMode() {
         isCinemaMode = !isCinemaMode;
-        if (isCinemaMode) { uiPanel.classList.add('hidden'); revealUiBtn.classList.add('hidden'); } 
-        else { revealUiBtn.classList.remove('hidden'); }
+        if (isCinemaMode) { 
+            leftToolbar.classList.add('hidden'); 
+            rightPanel.classList.add('hidden'); 
+            subToolbar.classList.add('hidden'); 
+            revealUiBtn.classList.add('hidden'); 
+        } else { 
+            leftToolbar.classList.remove('hidden'); 
+            rightPanel.classList.remove('hidden'); 
+            updateToolUI(currentMode); 
+            revealUiBtn.classList.add('hidden'); 
+        }
     }
 
     document.getElementById('toggle-square').onclick = () => calibSquare.style.display = (calibSquare.style.display === 'none' || calibSquare.style.display === '') ? 'block' : 'none';
@@ -1091,7 +1320,7 @@ try {
     createNewScene();
 
 } catch (e) {
-    alert("ERRORE DI CARICAMENTO:\n" + e.message);
+    showToast("ERRORE GRAVE: " + e.message, "error");
     console.error(e);
 }
 </script>
